@@ -59,6 +59,9 @@ jobs:
           ./addons/addon-unicode-graphemes/lib/* \
           ./addons/addon-unicode-graphemes/out/* \
           ./addons/addon-unicode-graphemes/out-*/* \
+          ./addons/addon-uc-width/lib/* \
+          ./addons/addon-uc-width/out/* \
+          ./addons/addon-uc-width/out-*/* \
           ./addons/addon-web-links/lib/* \
           ./addons/addon-web-links/out/* \
           ./addons/addon-web-links/out-*/* \
@@ -223,6 +226,8 @@ jobs:
       run: npm run test-integration-${{ matrix.browser }} --workers=50% --forbid-only --suite=addon-unicode-graphemes
     - name: Integration tests (addon-unicode11)
       run: npm run test-integration-${{ matrix.browser }} --workers=50% --forbid-only --suite=addon-unicode11
+    - name: Integration tests (addon-uc-width)
+      run: npm run test-integration-${{ matrix.browser }} --workers=50% --forbid-only --suite=addon-uc-width
     - name: Integration tests (addon-web-links)
       run: npm run test-integration-${{ matrix.browser }} --workers=50% --forbid-only --suite=addon-web-links
     - name: Integration tests (addon-webgl)

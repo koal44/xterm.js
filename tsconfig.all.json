@@ -18,6 +18,7 @@
     { "path": "./addons/addon-unicode11" },
     { "path": "./addons/addon-unicode-graphemes" },
     { "path": "./addons/addon-web-links" },
-    { "path": "./addons/addon-webgl" }
+    { "path": "./addons/addon-webgl" },
+    { "path": "./addons/addon-uc-width" }
   ]
 }
