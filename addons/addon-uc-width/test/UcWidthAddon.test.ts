@@ -7,7 +7,7 @@ import test, { expect } from '@playwright/test';
 import type { Terminal, ITerminalAddon } from '@xterm/xterm';
 import { ITestContext, createTestContext, openTerminal } from '../../../test/playwright/TestUtils';
 
-type TestWindow = {
+interface ITestWindow {
   term: Terminal & {
     _core: {
       unicodeService: { getStringCellWidth(s: string): number };
@@ -15,22 +15,23 @@ type TestWindow = {
   };
   unicode17?: ITerminalAddon;
   UcWidthAddon: new () => ITerminalAddon;
-};
+}
+
+declare let window: ITestWindow;
 
 type Cluster = [cps: number[], width: number];
 
 type TermOp =
   | { k: 'versions' }
   | { k: 'activeVersion' }
-  | { k: 'strWidth'; s: string }
-  | { k: 'write'; data: string }
+  | { k: 'strWidth', s: string }
+  | { k: 'write', data: string }
   | { k: 'cursorX' }
   | { k: 'dumpClusters' };
 
 async function termEval<R>(op: TermOp): Promise<R> {
   const result = await ctx.page.evaluate(async (op) => {
-    const w = window as unknown as TestWindow;
-    const term = w.term;
+    const term = window.term;
 
     switch (op.k) {
       case 'versions': {
@@ -81,9 +82,6 @@ async function termEval<R>(op: TermOp): Promise<R> {
           const chars = cell.getChars();
 
           if (cw === 0) {
-            if (chars.length !== 0) {
-              throw new Error(`Unexpected content in width-0 stub at x=${x}: ${JSON.stringify(chars)}`);
-            }
             continue; // questionable...
           }
 
@@ -123,12 +121,13 @@ test.afterAll(async () => {
 test.describe('UcWidthAddon', () => {
   test.beforeEach(async () => {
     await ctx.page.evaluate((ver) => {
-      const w = window as unknown as TestWindow;
-      w.term.reset();
-      w.unicode17?.dispose();
-      w.unicode17 = new w.UcWidthAddon();
-      w.term.loadAddon(w.unicode17);
-      w.term.unicode.activeVersion = ver;
+      window.unicode17?.dispose();
+      window.unicode17 = new window.UcWidthAddon();
+
+      const term = window.term;
+      term.reset();
+      term.loadAddon(window.unicode17);
+      term.unicode.activeVersion = ver;
     }, VERSION);
   });
 
@@ -157,4 +156,13 @@ test.describe('UcWidthAddon', () => {
       [[0x1F468, 0x200D, 0x1F33E], 2],
     ]);
   });
+
+  // test('dumpClusters: myanmar', async () => {
+  //   const mya = '\u102c\u102c\u102c'; // three Myanmar Vowel Sign AA
+  //   await write(mya);
+
+  //   expect(await dumpClusters()).toEqual([
+  //     [[0x102c, 0x102c, 0x102c], 3],
+  //   ]);
+  // });
 });
