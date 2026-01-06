@@ -12,6 +12,7 @@ if ('WebAssembly' in window) {
   const imageAddon = require('@xterm/addon-image');
   ImageAddon = imageAddon.ImageAddon;
 }
+const SOCKET_REPORTER = Symbol('socketReporter');
 
 import { Terminal, ITerminalOptions, type ITheme } from '@xterm/xterm';
 import { AttachAddon } from '@xterm/addon-attach';
@@ -55,6 +56,7 @@ export interface IWindowWithTerminal extends Window {
   UnicodeGraphemesAddon?: typeof UnicodeGraphemesAddon;
   UcWidthAddon?: typeof UcWidthAddon;
   LigaturesAddon?: typeof LigaturesAddon;
+  sockReporter?: ISocketReporter;
 }
 declare let window: IWindowWithTerminal;
 
@@ -372,6 +374,7 @@ function createTerminal(): Terminal {
       pid = processId;
       socketURL += processId;
       socket = new WebSocket(socketURL);
+      installSocketReporter(socket);
       socket.onopen = runRealTerminal;
       socket.onclose = runFakeTerminal;
       socket.onerror = runFakeTerminal;
@@ -633,3 +636,60 @@ function updateTerminalSize(): void {
   );
   console.groupEnd();
 };
+
+
+interface ISocketReporter {
+  on: boolean;
+  in: string[];
+  out: string[];
+  start(): void;
+  stop(): void;
+  clear(): void;
+  snapshot(): { in: string[], out: string[] };
+}
+
+function previewBinary(x: ArrayBufferLike | ArrayBufferView): string {
+  const u8 = ArrayBuffer.isView(x)
+    ? new Uint8Array(x.buffer, x.byteOffset, Math.min(x.byteLength, 64))
+    : new Uint8Array(x, 0, Math.min(x.byteLength, 64));
+  let hex = '';
+  for (const b of u8) hex += b.toString(16).padStart(2, '0');
+  return `<<binary:${u8.byteLength}B:${hex}>>`;
+}
+
+function installSocketReporter(socket: WebSocket): ISocketReporter {
+  const anySock = socket as any;
+  if (anySock[SOCKET_REPORTER]) return anySock[SOCKET_REPORTER] as ISocketReporter;
+
+  const rep: ISocketReporter = {
+    on: false,
+    in: [],
+    out: [],
+    start() { this.in.length = 0; this.out.length = 0; this.on = true; },
+    stop() { this.on = false; },
+    clear() { this.in.length = 0; this.out.length = 0; },
+    snapshot() { return { in: this.in.slice(), out: this.out.slice() }; }
+  };
+
+  const origSend = socket.send.bind(socket);
+  socket.send = ((data: string | ArrayBufferLike | Blob | ArrayBufferView) => {
+    if (rep.on) {
+      if (typeof data === 'string') rep.in.push(data);
+      else if (data instanceof Blob) rep.in.push(`<<blob:${data.size}B:${data.type || 'unknown'}>>`);
+      else rep.in.push(previewBinary(data));
+    }
+    return origSend(data as any);
+  }) as any;
+
+  socket.addEventListener('message', (ev: MessageEvent) => {
+    if (!rep.on) return;
+    const d = ev.data as unknown;
+    if (typeof d === 'string') rep.out.push(d);
+    else if (d instanceof Blob) rep.out.push(`<<blob:${d.size}B:${d.type || 'unknown'}>>`);
+    else rep.out.push('<<binary>>'); // super rare in this demo
+  });
+
+  anySock[SOCKET_REPORTER] = rep;
+  window.sockReporter = rep;
+  return rep;
+}

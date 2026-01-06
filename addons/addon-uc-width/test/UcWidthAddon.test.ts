@@ -7,6 +7,16 @@ import test, { expect } from '@playwright/test';
 import type { Terminal, ITerminalAddon } from '@xterm/xterm';
 import { ITestContext, createTestContext, openTerminal } from '../../../test/playwright/TestUtils';
 
+interface ISocketReporter {
+  on: boolean;
+  in: string[];
+  out: string[];
+  start(): void;
+  stop(): void;
+  clear(): void;
+  snapshot(): { in: string[], out: string[] };
+}
+
 interface ITestWindow {
   term: Terminal & {
     _core: {
@@ -15,6 +25,7 @@ interface ITestWindow {
   };
   unicode17?: ITerminalAddon;
   UcWidthAddon: new () => ITerminalAddon;
+  sockReporter: ISocketReporter;
 }
 
 declare let window: ITestWindow;
@@ -27,7 +38,10 @@ type TermOp =
   | { k: 'strWidth', s: string }
   | { k: 'write', data: string }
   | { k: 'cursorX' }
-  | { k: 'dumpClusters' };
+  | { k: 'dumpClusters' }
+  | { k: 'hasSockRep' }
+  | { k: 'sockRepStart' }
+  | { k: 'sockRepSnapshot' };
 
 async function termEval<R>(op: TermOp): Promise<R> {
   const result = await ctx.page.evaluate(async (op) => {
@@ -93,6 +107,21 @@ async function termEval<R>(op: TermOp): Promise<R> {
 
         return out;
       }
+
+      case 'hasSockRep': {
+        return !!window.sockReporter;
+      }
+      case 'sockRepStart': {
+        const r = window.sockReporter as ISocketReporter | undefined;
+        if (!r) throw new Error('sockRep not installed');
+        r.start();
+        return undefined;
+      }
+      case 'sockRepSnapshot': {
+        const r = window.sockReporter as ISocketReporter | undefined;
+        if (!r) throw new Error('sockRep not installed');
+        return r.snapshot();
+      }
     }
   }, op);
 
@@ -105,6 +134,11 @@ const strWidth = (s: string) => termEval<number>({ k: 'strWidth', s });
 const write = (data: string) => termEval<void>({ k: 'write', data });
 const cursorX = () => termEval<number>({ k: 'cursorX' });
 const dumpClusters = () => termEval<Cluster[]>({ k: 'dumpClusters' });
+
+const hasSocket = () => ctx.page.evaluate(() => typeof (window as any).socket !== 'undefined');
+const hasSockRep = () => termEval<boolean>({ k: 'hasSockRep' });
+const sockRepStart = () => termEval<void>({ k: 'sockRepStart' });
+const sockRepSnapshot = () => termEval<{ in: string[], out: string[] }>({ k: 'sockRepSnapshot' });
 
 let ctx: ITestContext;
 const VERSION = '17';
@@ -155,6 +189,19 @@ test.describe('UcWidthAddon', () => {
     expect(await dumpClusters()).toEqual([
       [[0x1F468, 0x200D, 0x1F33E], 2],
     ]);
+  });
+
+  test('socket reporter captures outbound sends', async () => {
+    // console.log('hasSocket', await hasSocket());
+    expect(await hasSocket()).toBe(true);
+    expect(await hasSockRep()).toBe(true);
+
+
+    await sockRepStart();
+    await write('smoke test');
+
+    const snap = await sockRepSnapshot();
+    expect(snap.in.join('')).toContain('foo');
   });
 
   // test('dumpClusters: myanmar', async () => {
