@@ -1118,9 +1118,19 @@ export class CoreBrowserTerminal extends CoreTerminal implements ITerminal {
       this.textarea!.value = '';
     }
 
+    // A single keypress can be encoded as a "burst" (e.g. 0x7F repeated).
+    let keyBurst = result.key;
+
+    if (result.key === C0.DEL && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      const prevCell = this._findPrevCell();
+      if (!prevCell) return;
+      const nDel = this._countUtf16CodeUnits(prevCell.text);
+      keyBurst = C0.DEL.repeat(Math.max(1, nDel));
+    }
+
     this._onKey.fire({ key: result.key, domEvent: event });
     this._showCursor();
-    this.coreService.triggerDataEvent(result.key, true);
+    this.coreService.triggerDataEvent(keyBurst, true);
 
     // Cancel events when not in screen reader mode so events don't get bubbled up and handled by
     // other listeners. When screen reader mode is enabled, we don't cancel them (unless ctrl or alt
@@ -1131,6 +1141,38 @@ export class CoreBrowserTerminal extends CoreTerminal implements ITerminal {
     }
 
     this._keyDownHandled = true;
+  }
+
+  private _findPrevCell(): { y: number, x: number, text: string } | null {
+    let y = this.buffer.y;
+    let x = this.buffer.x - 1;
+
+    while (y >= 0) {
+      const line = this.buffer.lines.get(y);
+      if (!line) return null;
+
+      if (x < 0) {
+        y--;
+        if (y < 0) return null;
+
+        const prev = this.buffer.lines.get(y);
+        if (!prev) return null;
+
+        x = prev.length - 1;
+        continue;
+      }
+
+      const text = line.getString(x);
+      if (text) return { y, x, text };
+
+      x--;
+    }
+
+    return null;
+  }
+
+  private _countUtf16CodeUnits(s: string): number {
+    return s.length;
   }
 
   private _isThirdLevelShift(browser: IBrowser, ev: KeyboardEvent): boolean {
