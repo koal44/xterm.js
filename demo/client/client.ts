@@ -13,6 +13,7 @@ if ('WebAssembly' in window) {
   ImageAddon = imageAddon.ImageAddon;
 }
 const SOCKET_REPORTER = Symbol('socketReporter');
+const _td = new TextDecoder('utf-8', { fatal: false });
 
 import { Terminal, ITerminalOptions, type ITheme } from '@xterm/xterm';
 import { AttachAddon } from '@xterm/addon-attach';
@@ -640,56 +641,79 @@ function updateTerminalSize(): void {
 
 interface ISocketReporter {
   on: boolean;
-  in: string[];
-  out: string[];
+  log: string[];
   start(): void;
-  stop(): void;
-  clear(): void;
-  snapshot(): { in: string[], out: string[] };
-}
-
-function previewBinary(x: ArrayBufferLike | ArrayBufferView): string {
-  const u8 = ArrayBuffer.isView(x)
-    ? new Uint8Array(x.buffer, x.byteOffset, Math.min(x.byteLength, 64))
-    : new Uint8Array(x, 0, Math.min(x.byteLength, 64));
-  let hex = '';
-  for (const b of u8) hex += b.toString(16).padStart(2, '0');
-  return `<<binary:${u8.byteLength}B:${hex}>>`;
 }
 
 function installSocketReporter(socket: WebSocket): ISocketReporter {
   const anySock = socket as any;
   if (anySock[SOCKET_REPORTER]) return anySock[SOCKET_REPORTER] as ISocketReporter;
 
-  const rep: ISocketReporter = {
+  try { socket.binaryType = 'arraybuffer'; } catch {}
+
+  const rep = {
     on: false,
-    in: [],
-    out: [],
-    start() { this.in.length = 0; this.out.length = 0; this.on = true; },
-    stop() { this.on = false; },
-    clear() { this.in.length = 0; this.out.length = 0; },
-    snapshot() { return { in: this.in.slice(), out: this.out.slice() }; }
+    log: [] as string[],
+    start() { this.log.length = 0; this.on = true; },
   };
 
   const origSend = socket.send.bind(socket);
-  socket.send = ((data: string | ArrayBufferLike | Blob | ArrayBufferView) => {
-    if (rep.on) {
-      if (typeof data === 'string') rep.in.push(data);
-      else if (data instanceof Blob) rep.in.push(`<<blob:${data.size}B:${data.type || 'unknown'}>>`);
-      else rep.in.push(previewBinary(data));
-    }
-    return origSend(data as any);
+  socket.send = ((data: any) => {
+    logSock(rep, '<<< ', data);
+    return origSend(data);
   }) as any;
 
   socket.addEventListener('message', (ev: MessageEvent) => {
-    if (!rep.on) return;
-    const d = ev.data as unknown;
-    if (typeof d === 'string') rep.out.push(d);
-    else if (d instanceof Blob) rep.out.push(`<<blob:${d.size}B:${d.type || 'unknown'}>>`);
-    else rep.out.push('<<binary>>'); // super rare in this demo
+    logSock(rep, '>>> ', ev.data);
   });
 
   anySock[SOCKET_REPORTER] = rep;
-  window.sockReporter = rep;
+  (window as any).sockReporter = rep;
   return rep;
+}
+
+function logSock(rep: ISocketReporter, prefix: '<<< ' | '>>> ', data: unknown): void {
+  if (!rep.on) return;
+
+  let s: string;
+  if (typeof data === 'string') {
+    s = escapeForLog(data);
+  } else if (data instanceof ArrayBuffer) {
+    s = previewBinary(data);
+  } else if (ArrayBuffer.isView(data)) {
+    s = previewBinary(data);
+  } else if (data instanceof Blob) {
+    s = `<<blob:${data.size}B:${data.type || 'unknown'}>>`;
+  } else {
+    s = `<<unknown:${Object.prototype.toString.call(data)}>>`;
+  }
+
+  rep.log.push(prefix + s);
+}
+
+function previewBinary(data: ArrayBufferLike | ArrayBufferView): string {
+  const u8 =
+    data instanceof ArrayBuffer
+      ? new Uint8Array(data)
+      : ArrayBuffer.isView(data)
+        ? new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
+        : new Uint8Array(data);
+
+  return escapeForLog(_td.decode(u8));
+}
+
+function escapeForLog(s: string): string {
+  // Make control characters visible
+  let out = '';
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    if (c === 0x1b) out += '\\x1b';
+    else if (c === 0x0d) out += '\\r';
+    else if (c === 0x0a) out += '\\n';
+    else if (c === 0x09) out += '\\t';
+    else if (c < 0x20 || c === 0x7f) out += `\\x${c.toString(16).padStart(2, '0')}`;
+    else if (c === 0x200D) out += '{zwj}';
+    else out += s[i];
+  }
+  return out;
 }

@@ -1121,12 +1121,12 @@ export class CoreBrowserTerminal extends CoreTerminal implements ITerminal {
     // A single keypress can be encoded as a "burst" (e.g. 0x7F repeated).
     let keyBurst = result.key;
 
-    if (result.key === C0.DEL && !event.altKey && !event.ctrlKey && !event.metaKey) {
-      const prevCell = this._findPrevCell();
-      if (!prevCell) return;
-      const nDel = this._countUtf16CodeUnits(prevCell.text);
-      keyBurst = C0.DEL.repeat(Math.max(1, nDel));
-    }
+    // if (result.key === C0.DEL && !event.altKey && !event.ctrlKey && !event.metaKey) {
+    //   const prevCell = this._findPrevCell();
+    //   if (!prevCell) return;
+    //   const nDel = this._countUtf16CodeUnits(prevCell.text);
+    //   keyBurst = C0.DEL.repeat(Math.max(1, nDel));
+    // }
 
     this._onKey.fire({ key: result.key, domEvent: event });
     this._showCursor();

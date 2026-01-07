@@ -14,6 +14,131 @@
   <body>
     <div id="banner">
       <span class="banner-title">xterm.js</span>
+
+
+      <div id="dev-inject">
+        <div class="dev-group" title="Inject test strings (typed, not pasted)">
+          <button class="dev-btn" data-inject="ABC123🙂" title="ABC123🙂">🙂</button>
+          <button class="dev-btn" data-inject="ABC123👨‍🌾" title="ABC123👨‍🌾">👨‍🌾</button>
+          <button class="dev-btn" data-inject="ABC123👨‍👩‍👧‍👦" title="ABC123👨‍👩‍👧‍👦">👨‍👩‍👧‍👦</button>
+          <button class="dev-btn" data-inject="ABC123🇺🇳" title="ABC123🇺🇳">🇺🇳</button>
+        </div>
+
+        <span class="dev-sep" aria-hidden="true">|</span>
+
+        <div class="dev-group" title="Run mipty (type command + Enter)">
+          <button class="dev-btn dev-btn-text" data-cmd="python3 scratch/mipty.py" title="python3 scratch/mipty.py">bash</button>
+          <button class="dev-btn dev-btn-text" data-cmd="python3 scratch/mipty.py --shell /usr/bin/zsh" title="python3 scratch/mipty.py --shell /usr/bin/zsh">zsh</button>
+          <button class="dev-btn dev-btn-text" data-cmd="python3 scratch/mipty.py --shell /usr/bin/fish" title="python3 scratch/mipty.py --shell /usr/bin/fish">fish</button>
+          <button class="dev-btn dev-btn-text" data-cmd="python scratch/mipty-pwsh.py" title="python scratch/mipty-pwsh.py">pwsh</button>
+        </div>
+
+        <span class="dev-sep" aria-hidden="true">|</span>
+
+        <div class="dev-group" title="Socket trace">
+          <button class="dev-btn dev-btn-text" data-trace="start" title="Clear + start socket trace">trace start</button>
+          <button class="dev-btn dev-btn-text" data-trace="log" title="Dump trace to console">trace log</button>
+        </div>
+      </div>
+
+      <style>
+        /* dev-only; feel free to move to index.css */
+        #dev-inject {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          margin-left: 10px;
+          user-select: none;
+        }
+        #dev-inject .dev-group { display: inline-flex; gap: 6px; align-items: center; }
+        #dev-inject .dev-sep { opacity: 0.5; }
+        #dev-inject .dev-btn {
+          font: inherit;
+          line-height: 1;
+          padding: 2px 6px;
+          border-radius: 6px;
+          border: 1px solid rgba(255,255,255,0.25);
+          background: rgba(255,255,255,0.06);
+          color: inherit;
+          cursor: pointer;
+        }
+        #dev-inject .dev-btn:hover { background: rgba(255,255,255,0.12); }
+        #dev-inject .dev-btn:active { transform: translateY(1px); }
+        #dev-inject .dev-btn-text { font-size: 12px; padding: 3px 7px; }
+      </style>
+
+      <script>
+        (function () {
+          function getTerm() {
+            // You said window.term exists; keep this flexible.
+            return window.term || window._term || null;
+          }
+
+          function inject(data) {
+            const term = getTerm();
+            if (!term?._core?.coreService?.triggerDataEvent) {
+              console.warn("term not ready for triggerDataEvent");
+              return;
+            }
+            // true => wasUserInput (so it follows normal input flow)
+            term._core.coreService.triggerDataEvent(data, true);
+          }
+
+          function clickHandler(ev) {
+            const btn = ev.target.closest("button");
+            if (!btn) return;
+
+            const s = btn.getAttribute("data-inject");
+            if (s != null) {
+              inject(s);
+              return;
+            }
+
+            const cmd = btn.getAttribute("data-cmd");
+            if (cmd != null) {
+              // Type the command and press Enter.
+              inject(cmd + "\r");
+              return;
+            }
+
+            const t = btn.getAttribute("data-trace");
+            if (t) {
+              if (t === "start") traceStart();
+              else if (t === "log") traceLog();
+              return;
+            }
+          }
+
+          function wireUp() {
+            const root = document.getElementById("dev-inject");
+            if (!root) return;
+            root.addEventListener("click", clickHandler);
+          }
+
+          function traceStart() {
+            const rep = window.sockReporter;
+            if (!rep) { console.warn("sockReporter not installed"); return; }
+            rep.start();
+          }
+
+          function traceLog() {
+            const rep = window.sockReporter;
+            if (!rep) { console.warn("sockReporter not installed"); return; }
+            // big pasteable block
+            console.log(rep.log.join("\n"));
+          }
+
+          // Wait until term appears; the bundle is defer-loaded so this is usually immediate,
+          wireUp();
+          let tries = 0;
+          const t = setInterval(() => {
+            tries++;
+            if (getTerm()?._core?.coreService?.triggerDataEvent || tries > 200) clearInterval(t);
+          }, 25);
+        })();
+      </script>
+
+
       <div class="banner-tabs"></div>
     </div>
     <div id="container">
