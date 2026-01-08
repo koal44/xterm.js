@@ -98,6 +98,14 @@
             if (cmd != null) {
               // Type the command and press Enter.
               inject(cmd + "\r");
+
+              if (/pwsh/.test(cmd)) {
+                // Full terminal re-baseline (cursor, scrollback, modes)
+                const term = getTerm();
+                setTimeout(() => {
+                  term.reset();
+                }, 500);
+              }
               return;
             }
 
