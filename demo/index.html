@@ -17,28 +17,45 @@
 
 
       <div id="dev-inject">
-        <div class="dev-group" title="Inject test strings (typed, not pasted)">
-          <button class="dev-btn" data-inject="ABC123🙂" title="ABC123🙂">🙂</button>
-          <button class="dev-btn" data-inject="ABC123👨‍🌾" title="ABC123👨‍🌾">👨‍🌾</button>
-          <button class="dev-btn" data-inject="ABC123👨‍👩‍👧‍👦" title="ABC123👨‍👩‍👧‍👦">👨‍👩‍👧‍👦</button>
-          <button class="dev-btn" data-inject="ABC123🇺🇳" title="ABC123🇺🇳">🇺🇳</button>
-        </div>
-
-        <span class="dev-sep" aria-hidden="true">|</span>
-
-        <div class="dev-group" title="Run mipty (type command + Enter)">
-          <button class="dev-btn dev-btn-text" data-cmd="python3 scratch/mipty.py" title="python3 scratch/mipty.py">bash</button>
-          <button class="dev-btn dev-btn-text" data-cmd="python3 scratch/mipty.py --shell /usr/bin/zsh" title="python3 scratch/mipty.py --shell /usr/bin/zsh">zsh</button>
-          <button class="dev-btn dev-btn-text" data-cmd="python3 scratch/mipty.py --shell /usr/bin/fish" title="python3 scratch/mipty.py --shell /usr/bin/fish">fish</button>
-          <button class="dev-btn dev-btn-text" data-cmd="python scratch/mipty-pwsh.py" title="python scratch/mipty-pwsh.py">pwsh</button>
-        </div>
-
-        <span class="dev-sep" aria-hidden="true">|</span>
-
         <div class="dev-group" title="Socket trace">
           <button class="dev-btn dev-btn-text" data-trace="start" title="Clear + start socket trace">trace start</button>
           <button class="dev-btn dev-btn-text" data-trace="log" title="Dump trace to console">trace log</button>
         </div>
+        <span class="dev-sep" aria-hidden="true">|</span>
+        <div class="dev-group" title="Inject test strings (typed, not pasted)">
+          <button class="dev-btn" data-inject="ABC🙂" title="ABC🙂">🙂</button>
+          <button class="dev-btn" data-inject="ABC👨‍🌾" title="ABC👨‍🌾">👨‍🌾</button>
+          <button class="dev-btn" data-inject="ABC👨‍👩‍👧‍👦" title="ABC👨‍👩‍👧‍👦">👨‍👩‍👧‍👦</button>
+          <button class="dev-btn" data-inject="ABC🇺🇳" title="ABC🇺🇳">🇺🇳</button>
+        </div>
+        <span class="dev-sep" aria-hidden="true">|</span>
+        <div class="dev-group" title="Key ops (stdin)">
+          <!-- DEL bursts -->
+          <div class="dev-group" title="Send DEL (0x7F) burst">
+            <input
+              id="dev-del-n" class="dev-num"
+              type="number"
+              min="1" max="64"
+              step="1" value="1"
+              inputmode="numeric"
+              title="DEL repeat count"
+            />
+            <button class="dev-btn dev-btn-text" data-del="1" title="Send DEL × N">DEL</button>
+          </div>
+
+          <button class="dev-btn dev-btn-text" data-send="\x1b" title="Escape">ESC</button>
+          <!-- "\x1b[H\x1b[1;5F"
+          "\x1b[H\x1b[4;5~" -->
+
+          <span class="dev-sep" aria-hidden="true">|</span>
+
+          <button class="dev-btn dev-btn-text" data-send="\x1b[D" title="Left arrow">←</button>
+          <button class="dev-btn dev-btn-text" data-send="\x1b[C" title="Right arrow">→</button>
+          <button class="dev-btn dev-btn-text" data-send="\x1b[H" title="Home">HOME</button>
+          <button class="dev-btn dev-btn-text" data-send="\x1b[F" title="End">END</button>
+
+        </div>
+
       </div>
 
       <style>
@@ -65,6 +82,24 @@
         #dev-inject .dev-btn:hover { background: rgba(255,255,255,0.12); }
         #dev-inject .dev-btn:active { transform: translateY(1px); }
         #dev-inject .dev-btn-text { font-size: 12px; padding: 3px 7px; }
+
+        #dev-inject .dev-num{
+          width: 52px;
+          font: inherit;
+          font-size: 12px;
+          line-height: 1;
+          padding: 2px 6px;
+          border-radius: 6px;
+          border: 1px solid rgba(255,255,255,0.25);
+          background: rgba(255,255,255,0.06);
+          color: inherit;
+          outline: none;
+        }
+        #dev-inject .dev-num:focus{
+          border-color: rgba(255,255,255,0.45);
+          background: rgba(255,255,255,0.10);
+        }
+
       </style>
 
       <script>
@@ -72,6 +107,22 @@
           function getTerm() {
             // You said window.term exists; keep this flexible.
             return window.term || window._term || null;
+          }
+
+          function unescapeBytes(s) {
+            // Supports \xHH, \uHHHH, \n, \r, \t, \\.
+            return s.replace(
+              /\\x([0-9a-fA-F]{2})|\\u([0-9a-fA-F]{4})|\\n|\\r|\\t|\\\\/g,
+              (m, hx, hu) => {
+                if (hx) return String.fromCharCode(parseInt(hx, 16));
+                if (hu) return String.fromCharCode(parseInt(hu, 16));
+                if (m === '\\n') return '\n';
+                if (m === '\\r') return '\r';
+                if (m === '\\t') return '\t';
+                if (m === '\\\\') return '\\';
+                return m;
+              }
+            );
           }
 
           function inject(data) {
@@ -94,25 +145,27 @@
               return;
             }
 
-            const cmd = btn.getAttribute("data-cmd");
-            if (cmd != null) {
-              // Type the command and press Enter.
-              inject(cmd + "\r");
-
-              if (/pwsh/.test(cmd)) {
-                // Full terminal re-baseline (cursor, scrollback, modes)
-                const term = getTerm();
-                setTimeout(() => {
-                  term.reset();
-                }, 500);
-              }
-              return;
-            }
-
             const t = btn.getAttribute("data-trace");
             if (t) {
               if (t === "start") traceStart();
               else if (t === "log") traceLog();
+              return;
+            }
+
+            const del = btn.getAttribute("data-del");
+            if (del != null) {
+              const nEl = document.getElementById("dev-del-n");
+              let n = 1;
+              if (nEl && typeof nEl.value === "string") {
+                n = Math.max(1, Math.min(64, parseInt(nEl.value || "1", 10) || 1));
+              }
+              inject("\x7f".repeat(n));
+              return;
+            }
+
+            const send = btn.getAttribute("data-send");
+            if (send != null) {
+              inject(unescapeBytes(send));
               return;
             }
           }
