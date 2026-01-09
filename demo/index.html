@@ -29,6 +29,17 @@
           <button class="dev-btn" data-inject="ABC🇺🇳" title="ABC🇺🇳">🇺🇳</button>
         </div>
         <span class="dev-sep" aria-hidden="true">|</span>
+
+        <div class="dev-group" title="Shell/profile mapping for key sequences">
+          <label class="dev-label" for="dev-shell">shell</label>
+          <select id="dev-shell" class="dev-select" title="Select shell/editor profile">
+            <option value="bash">bash / readline</option>
+            <option value="zsh">zsh / zle</option>
+            <option value="fish">fish</option>
+            <option value="powershell">PowerShell / PSReadLine</option>
+          </select>
+        </div>
+
         <div class="dev-group" title="Key ops (stdin)">
           <!-- DEL bursts -->
           <div class="dev-group" title="Send DEL (0x7F) burst">
@@ -43,16 +54,12 @@
             <button class="dev-btn dev-btn-text" data-del="1" title="Send DEL × N">DEL</button>
           </div>
 
-          <button class="dev-btn dev-btn-text" data-send="\x1b" title="Escape">ESC</button>
-          <!-- "\x1b[H\x1b[1;5F"
-          "\x1b[H\x1b[4;5~" -->
-
+          <button class="dev-btn dev-btn-text" data-action="clear" title="Clear line">CLEAR</button>
           <span class="dev-sep" aria-hidden="true">|</span>
-
-          <button class="dev-btn dev-btn-text" data-send="\x1b[D" title="Left arrow">←</button>
-          <button class="dev-btn dev-btn-text" data-send="\x1b[C" title="Right arrow">→</button>
-          <button class="dev-btn dev-btn-text" data-send="\x1b[H" title="Home">HOME</button>
-          <button class="dev-btn dev-btn-text" data-send="\x1b[F" title="End">END</button>
+          <button class="dev-btn dev-btn-text" data-action="left" title="Left">←</button>
+          <button class="dev-btn dev-btn-text" data-action="right" title="Right">→</button>
+          <button class="dev-btn dev-btn-text" data-action="home" title="Home">HOME</button>
+          <button class="dev-btn dev-btn-text" data-action="end" title="End">END</button>
 
         </div>
 
@@ -100,6 +107,28 @@
           background: rgba(255,255,255,0.10);
         }
 
+        #dev-inject .dev-label {
+          font-size: 12px;
+          opacity: 0.8;
+          margin-right: 4px;
+        }
+
+        #dev-inject .dev-select {
+          font: inherit;
+          font-size: 12px;
+          line-height: 1;
+          padding: 2px 6px;
+          border-radius: 6px;
+          border: 1px solid rgba(255,255,255,0.25);
+          background: rgba(255,255,255,0.06);
+          color: inherit;
+          outline: none;
+        }
+        #dev-inject .dev-select:focus {
+          border-color: rgba(255,255,255,0.45);
+          background: rgba(255,255,255,0.10);
+        }
+
       </style>
 
       <script>
@@ -107,6 +136,74 @@
           function getTerm() {
             // You said window.term exists; keep this flexible.
             return window.term || window._term || null;
+          }
+
+          const SHELL_PROFILES = {
+            // bash/readline: CSI arrows typically fine; home/end often CSI H/F but can vary.
+            bash: {
+              clear: "\x15",         // Ctrl+U
+              left: "\x1b[D",        // CSI D
+              right: "\x1b[C",       // CSI C
+              home: "\x1b[H",        // CSI H
+              end: "\x1b[F",         // CSI F
+            },
+
+            // zsh/zle: often prefers SS3 home/end in app-cursor contexts; keep CSI arrows.
+            zsh: {
+              clear: "\x15",
+              left: "\x1b[D",
+              right: "\x1b[C",
+              home: "\x1bOH",        // SS3 Home (fixes your BEL \x07 issue most likely)
+              end: "\x1bOF",         // SS3 End
+            },
+
+            // fish: tends to accept CSI arrows; home/end vary, but SS3 often works in app mode too.
+            fish: {
+              clear: "\x15",
+              left: "\x1b[D",
+              right: "\x1b[C",
+              home: "\x1bOH",
+              end: "\x1bOF",
+            },
+
+            // PSReadLine: kill via Ctrl+U is not reliable; prefer ESC (revert line) or Ctrl+U if you confirm.
+            // Based on your earlier experience: HOME/END as CSI H/F worked.
+            powershell: {
+              clear: "\x1b",          // ESC (PSReadLine revert line) — keep as profile-specific
+              left: "\x1b[D",
+              right: "\x1b[C",
+              home: "\x1b[H",
+              end: "\x1b[F",
+            },
+          };
+
+          let currentShell = "bash";
+          let currentProfile = SHELL_PROFILES[currentShell];
+
+          function setShellProfile(name) {
+            const p = SHELL_PROFILES[name];
+            if (!p) {
+              console.warn(`[dev] unknown shell profile: ${name}`);
+              return;
+            }
+            currentShell = name;
+            currentProfile = p;
+            // Optional debug:
+            console.log(`[dev] shell profile = ${name}`);
+          }
+
+          function initShellProfileFromUI() {
+            const sel = document.getElementById("dev-shell");
+            if (!sel) {
+              // No dropdown in DOM; keep defaults.
+              return;
+            }
+            // If you want a different default, set <option selected> in HTML.
+            setShellProfile(sel.value || "bash");
+
+            sel.addEventListener("change", () => {
+              setShellProfile(sel.value);
+            });
           }
 
           function unescapeBytes(s) {
@@ -163,9 +260,14 @@
               return;
             }
 
-            const send = btn.getAttribute("data-send");
-            if (send != null) {
-              inject(unescapeBytes(send));
+            const action = btn.getAttribute("data-action");
+            if (action) {
+              const seq = currentProfile?.[action];
+              if (!seq) {
+                console.warn(`no sequence for action=${action} in profile=${currentShell}`);
+                return;
+              }
+              inject(seq);
               return;
             }
           }
@@ -174,6 +276,8 @@
             const root = document.getElementById("dev-inject");
             if (!root) return;
             root.addEventListener("click", clickHandler);
+
+            initShellProfileFromUI();
           }
 
           function traceStart() {
