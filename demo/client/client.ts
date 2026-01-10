@@ -12,8 +12,6 @@ if ('WebAssembly' in window) {
   const imageAddon = require('@xterm/addon-image');
   ImageAddon = imageAddon.ImageAddon;
 }
-const SOCKET_REPORTER = Symbol('socketReporter');
-const _td = new TextDecoder('utf-8', { fatal: false });
 
 import { Terminal, ITerminalOptions, type ITheme } from '@xterm/xterm';
 import { AttachAddon } from '@xterm/addon-attach';
@@ -28,6 +26,7 @@ import { OptionsWindow } from './components/window/optionsWindow';
 import { StyleWindow } from './components/window/styleWindow';
 import { TestWindow } from './components/window/testWindow';
 import { VtWindow } from './components/window/vtWindow';
+import { ShellExplorerWindow } from './components/window/shellExplorerWindow';
 import { ClipboardAddon } from '@xterm/addon-clipboard';
 import { FitAddon } from '@xterm/addon-fit';
 import { LigaturesAddon } from '@xterm/addon-ligatures';
@@ -57,7 +56,6 @@ export interface IWindowWithTerminal extends Window {
   UnicodeGraphemesAddon?: typeof UnicodeGraphemesAddon;
   UcWidthAddon?: typeof UcWidthAddon;
   LigaturesAddon?: typeof LigaturesAddon;
-  sockReporter?: ISocketReporter;
 }
 declare let window: IWindowWithTerminal;
 
@@ -223,6 +221,7 @@ if (document.location.pathname === '/test') {
   controlBar.registerWindow(new AddonImageWindow(typedTerm, addons), { afterId: 'addon-serialize', hidden: true, italics: true });
   addonWebglWindow = controlBar.registerWindow(new WebglWindow(typedTerm, addons), { afterId: 'addon-image', hidden: true, italics: true });
   controlBar.registerWindow(new TestWindow(typedTerm, addons, { disposeRecreateButtonHandler, createNewWindowButtonHandler }), { afterId: 'options' });
+  controlBar.registerWindow(new ShellExplorerWindow(typedTerm, addons, { getSocket: () => socket }));
   actionElements = {
     findNext: addonSearchWindow.findNextInput,
     findPrevious: addonSearchWindow.findPreviousInput,
@@ -375,7 +374,6 @@ function createTerminal(): Terminal {
       pid = processId;
       socketURL += processId;
       socket = new WebSocket(socketURL);
-      installSocketReporter(socket);
       socket.onopen = runRealTerminal;
       socket.onclose = runFakeTerminal;
       socket.onerror = runFakeTerminal;
@@ -637,83 +635,3 @@ function updateTerminalSize(): void {
   );
   console.groupEnd();
 };
-
-
-interface ISocketReporter {
-  on: boolean;
-  log: string[];
-  start(): void;
-}
-
-function installSocketReporter(socket: WebSocket): ISocketReporter {
-  const anySock = socket as any;
-  if (anySock[SOCKET_REPORTER]) return anySock[SOCKET_REPORTER] as ISocketReporter;
-
-  try { socket.binaryType = 'arraybuffer'; } catch {}
-
-  const rep = {
-    on: false,
-    log: [] as string[],
-    start() { this.log.length = 0; this.on = true; },
-  };
-
-  const origSend = socket.send.bind(socket);
-  socket.send = ((data: any) => {
-    logSock(rep, '<<< ', data);
-    return origSend(data);
-  }) as any;
-
-  socket.addEventListener('message', (ev: MessageEvent) => {
-    logSock(rep, '>>> ', ev.data);
-  });
-
-  anySock[SOCKET_REPORTER] = rep;
-  (window as any).sockReporter = rep;
-  return rep;
-}
-
-function logSock(rep: ISocketReporter, prefix: '<<< ' | '>>> ', data: unknown): void {
-  if (!rep.on) return;
-
-  let s: string;
-  if (typeof data === 'string') {
-    s = escapeForLog(data);
-  } else if (data instanceof ArrayBuffer) {
-    s = previewBinary(data);
-  } else if (ArrayBuffer.isView(data)) {
-    s = previewBinary(data);
-  } else if (data instanceof Blob) {
-    s = `<<blob:${data.size}B:${data.type || 'unknown'}>>`;
-  } else {
-    s = `<<unknown:${Object.prototype.toString.call(data)}>>`;
-  }
-
-  rep.log.push(prefix + s);
-}
-
-function previewBinary(data: ArrayBufferLike | ArrayBufferView): string {
-  const u8 =
-    data instanceof ArrayBuffer
-      ? new Uint8Array(data)
-      : ArrayBuffer.isView(data)
-        ? new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
-        : new Uint8Array(data);
-
-  return escapeForLog(_td.decode(u8));
-}
-
-function escapeForLog(s: string): string {
-  // Make control characters visible
-  let out = '';
-  for (let i = 0; i < s.length; i++) {
-    const c = s.charCodeAt(i);
-    if (c === 0x1b) out += '\\x1b';
-    else if (c === 0x0d) out += '\\r';
-    else if (c === 0x0a) out += '\\n';
-    else if (c === 0x09) out += '\\t';
-    else if (c < 0x20 || c === 0x7f) out += `\\x${c.toString(16).padStart(2, '0')}`;
-    else if (c === 0x200D) out += '{zwj}';
-    else out += s[i];
-  }
-  return out;
-}
