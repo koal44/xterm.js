@@ -19,6 +19,7 @@
       "@xterm/addon-webgl": ["../../addons/addon-webgl"],
       "@xterm/addon-unicode11": ["../../addons/addon-unicode11"],
       "@xterm/addon-unicode-graphemes": ["../../addons/addon-unicode-graphemes"],
+      "@xterm/addon-uc-width": ["../../addons/addon-uc-width"],
       "@xterm/addon-ligatures": ["../../addons/addon-ligatures"]
     }
   },

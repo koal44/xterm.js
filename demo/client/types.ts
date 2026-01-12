@@ -15,11 +15,12 @@ import type { SearchAddon } from '@xterm/addon-search';
 import type { SerializeAddon } from '@xterm/addon-serialize';
 import type { UnicodeGraphemesAddon } from '@xterm/addon-unicode-graphemes';
 import type { Unicode11Addon } from '@xterm/addon-unicode11';
+import type { UcWidthAddon } from '@xterm/addon-uc-width';
 import type { WebFontsAddon } from '@xterm/addon-web-fonts';
 import type { WebLinksAddon } from '@xterm/addon-web-links';
 import type { WebglAddon } from '@xterm/addon-webgl';
 
-export type AddonType = 'attach' | 'clipboard' | 'fit' | 'image' | 'progress' | 'search' | 'serialize' | 'unicode11' | 'unicodeGraphemes' | 'webFonts' | 'webLinks' | 'webgl' | 'ligatures';
+export type AddonType = 'attach' | 'clipboard' | 'fit' | 'image' | 'progress' | 'search' | 'serialize' | 'unicode11' | 'unicodeGraphemes' | 'unicode17' | 'webFonts' | 'webLinks' | 'webgl' | 'ligatures';
 
 export interface IDemoAddon<T extends AddonType> {
   name: T;
@@ -37,8 +38,9 @@ export interface IDemoAddon<T extends AddonType> {
                       T extends 'webLinks' ? typeof WebLinksAddon :
                         T extends 'unicode11' ? typeof Unicode11Addon :
                           T extends 'unicodeGraphemes' ? typeof UnicodeGraphemesAddon :
-                            T extends 'webgl' ? typeof WebglAddon :
-                              never
+                            T extends 'unicode17' ? typeof UcWidthAddon :
+                              T extends 'webgl' ? typeof WebglAddon :
+                                never
   );
   instance?: (
     T extends 'attach' ? AttachAddon :
@@ -53,8 +55,9 @@ export interface IDemoAddon<T extends AddonType> {
                       T extends 'webLinks' ? WebLinksAddon :
                         T extends 'unicode11' ? Unicode11Addon :
                           T extends 'unicodeGraphemes' ? UnicodeGraphemesAddon :
-                            T extends 'webgl' ? WebglAddon :
-                              never
+                            T extends 'unicode17' ? UcWidthAddon :
+                              T extends 'webgl' ? WebglAddon :
+                                never
   );
 }
 

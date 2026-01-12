@@ -38,6 +38,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { UnicodeGraphemesAddon } from '@xterm/addon-unicode-graphemes';
+import { UcWidthAddon } from '@xterm/addon-uc-width';
 import { AddonCollection, type AddonType, type IDemoAddon } from './types';
 
 export interface IWindowWithTerminal extends Window {
@@ -54,6 +55,7 @@ export interface IWindowWithTerminal extends Window {
   WebglAddon?: typeof WebglAddon;
   Unicode11Addon?: typeof Unicode11Addon;
   UnicodeGraphemesAddon?: typeof UnicodeGraphemesAddon;
+  UcWidthAddon?: typeof UcWidthAddon;
   LigaturesAddon?: typeof LigaturesAddon;
 }
 declare let window: IWindowWithTerminal;
@@ -82,6 +84,7 @@ const addons: AddonCollection = {
   webgl: { name: 'webgl', ctor: WebglAddon, canChange: true },
   unicode11: { name: 'unicode11', ctor: Unicode11Addon, canChange: true },
   unicodeGraphemes: { name: 'unicodeGraphemes', ctor: UnicodeGraphemesAddon, canChange: true },
+  unicode17: { name: 'unicode17', ctor: UcWidthAddon, canChange: true },
   ligatures: { name: 'ligatures', ctor: LigaturesAddon, canChange: true }
 };
 
@@ -151,6 +154,7 @@ const disposeRecreateButtonHandler: () => void = () => {
     addons.serialize.instance = undefined;
     addons.unicode11.instance = undefined;
     addons.unicodeGraphemes.instance = undefined;
+    addons.unicode17.instance = undefined;
     addons.ligatures.instance = undefined;
     addons.webLinks.instance = undefined;
     addons.webgl.instance = undefined;
@@ -201,6 +205,7 @@ if (document.location.pathname === '/test') {
   window.SerializeAddon = SerializeAddon;
   window.Unicode11Addon = Unicode11Addon;
   window.UnicodeGraphemesAddon = UnicodeGraphemesAddon;
+  window.UcWidthAddon = UcWidthAddon;
   window.LigaturesAddon = LigaturesAddon;
   window.WebLinksAddon = WebLinksAddon;
   window.WebglAddon = WebglAddon;
@@ -468,6 +473,9 @@ function initAddons(term: Terminal): void {
     if (name === 'unicodeGraphemes' && checkbox.checked) {
       term.unicode.activeVersion = '15-graphemes';
     }
+    if (name === 'unicode17' && checkbox.checked) {
+      term.unicode.activeVersion = '17';
+    }
     if (name === 'search' && checkbox.checked) {
       addons[name].instance.onDidChangeResults(e => updateFindResults(e));
     }
@@ -498,6 +506,8 @@ function initAddons(term: Terminal): void {
             term.unicode.activeVersion = '11';
           } else if (name === 'unicodeGraphemes') {
             term.unicode.activeVersion = '15-graphemes';
+          } else if (name === 'unicode17') {
+            term.unicode.activeVersion = '17';
           } else if (name === 'search') {
             controlBar.setTabVisible('addon-search', true);
             addons[name].instance.onDidChangeResults(e => updateFindResults(e));
@@ -513,7 +523,7 @@ function initAddons(term: Terminal): void {
       } else {
         if (name === 'webgl') {
           preDisposeWebgl();
-        } else if (name === 'unicode11' || name === 'unicodeGraphemes') {
+        } else if (name === 'unicode11' || name === 'unicodeGraphemes' || name === 'unicode17') {
           term.unicode.activeVersion = '6';
         } else if (name === 'search') {
           controlBar.setTabVisible('addon-search', false);
