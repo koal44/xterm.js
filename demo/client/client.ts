@@ -27,6 +27,7 @@ import { OptionsWindow } from './components/window/optionsWindow';
 import { StyleWindow } from './components/window/styleWindow';
 import { TestWindow } from './components/window/testWindow';
 import { VtWindow } from './components/window/vtWindow';
+import { ShellExplorerWindow } from 'components/window/shellExplorerWindow';
 import { ClipboardAddon } from '@xterm/addon-clipboard';
 import { FitAddon } from '@xterm/addon-fit';
 import { LigaturesAddon } from '@xterm/addon-ligatures';
@@ -224,6 +225,7 @@ if (document.location.pathname === '/test') {
   controlBar.registerWindow(new AddonWebFontsWindow(typedTerm, addons), { afterId: 'addon-image', hidden: true, italics: true });
   addonWebglWindow = controlBar.registerWindow(new WebglWindow(typedTerm, addons), { afterId: 'addon-web-fonts', hidden: true, italics: true });
   controlBar.registerWindow(new TestWindow(typedTerm, addons, { disposeRecreateButtonHandler, createNewWindowButtonHandler }), { afterId: 'options' });
+  controlBar.registerWindow(new ShellExplorerWindow(typedTerm, addons, { getSocket: () => socket }));
   actionElements = {
     findNext: addonSearchWindow.findNextInput,
     findPrevious: addonSearchWindow.findPreviousInput,
