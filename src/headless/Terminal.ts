@@ -21,7 +21,7 @@
  *   http://linux.die.net/man/7/urxvt
  */
 
-import { DEFAULT_ATTR_DATA } from 'common/buffer/BufferLine';
+import { DEFAULT_ATTR_DATA } from 'common/buffer/AttributeData';
 import { IBuffer } from 'common/buffer/Types';
 import { CoreTerminal } from 'common/CoreTerminal';
 import { IMarker, ITerminalOptions } from 'common/Types';

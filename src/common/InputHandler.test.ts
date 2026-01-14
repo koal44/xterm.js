@@ -6,10 +6,9 @@
 import { assert } from 'chai';
 import { InputHandler } from 'common/InputHandler';
 import { IBufferLine, IAttributeData, IColorEvent, ColorRequestType, SpecialColorIndex } from 'common/Types';
-import { DEFAULT_ATTR_DATA } from 'common/buffer/BufferLine';
 import { CellData } from 'common/buffer/CellData';
 import { Attributes, BgFlags, UnderlineStyle } from 'common/buffer/Constants';
-import { AttributeData, ExtendedAttrs } from 'common/buffer/AttributeData';
+import { AttributeData, ExtendedAttrs, DEFAULT_ATTR_DATA } from 'common/buffer/AttributeData';
 import { Params } from 'common/parser/Params';
 import { MockCoreService, MockBufferService, MockOptionsService, MockLogService, MockCoreMouseService, MockCharsetService, MockUnicodeService, MockOscLinkService } from 'common/TestUtils.test';
 import { IBufferService, ICoreService, type IOscLinkService } from 'common/services/Services';

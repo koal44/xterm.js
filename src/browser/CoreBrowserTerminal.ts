@@ -46,7 +46,7 @@ import { channels, color } from 'common/Color';
 import { CoreTerminal } from 'common/CoreTerminal';
 import * as Browser from 'common/Platform';
 import { ColorRequestType, CoreMouseAction, CoreMouseButton, CoreMouseEventType, IColorEvent, ITerminalOptions, KeyboardResultType, SpecialColorIndex } from 'common/Types';
-import { DEFAULT_ATTR_DATA } from 'common/buffer/BufferLine';
+import { DEFAULT_ATTR_DATA } from 'common/buffer/AttributeData';
 import { IBuffer } from 'common/buffer/Types';
 import { C0, C1_ESCAPED } from 'common/data/EscapeSequences';
 import { toRgbString } from 'common/input/XParseColor';

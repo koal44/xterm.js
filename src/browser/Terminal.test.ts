@@ -6,7 +6,7 @@
 import { MockCompositionHelper, MockRenderer, MockViewport, TestTerminal } from 'browser/TestUtils.test';
 import type { IBrowser } from 'browser/Types';
 import { assert } from 'chai';
-import { DEFAULT_ATTR_DATA } from 'common/buffer/BufferLine';
+import { DEFAULT_ATTR_DATA } from 'common/buffer/AttributeData';
 import { CellData } from 'common/buffer/CellData';
 import { MockUnicodeService } from 'common/TestUtils.test';
 import { IMarker } from 'common/Types';

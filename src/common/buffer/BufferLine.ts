@@ -4,7 +4,6 @@
  */
 
 import { CharData, IAttributeData, IBufferLine, ICellData, IExtendedAttrs } from 'common/Types';
-import { AttributeData } from 'common/buffer/AttributeData';
 import { CellData } from 'common/buffer/CellData';
 import { Attributes, BgFlags, CHAR_DATA_ATTR_INDEX, CHAR_DATA_CHAR_INDEX, CHAR_DATA_WIDTH_INDEX, Content, NULL_CELL_CHAR, NULL_CELL_CODE, NULL_CELL_WIDTH, WHITESPACE_CELL_CHAR } from 'common/buffer/Constants';
 import { stringFromCodePoint } from 'common/input/TextDecoder';
@@ -34,8 +33,6 @@ const enum Cell {
   FG = 1, // currently simply holds all known attrs
   BG = 2  // currently unused
 }
-
-export const DEFAULT_ATTR_DATA = Object.freeze(new AttributeData());
 
 // Work variables to avoid garbage collection
 let $startIndex = 0;

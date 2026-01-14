@@ -131,7 +131,6 @@ export class AttributeData implements IAttributeData {
   }
 }
 
-
 /**
  * Extended attributes for a cell.
  * Holds information about different underline styles and color.
@@ -209,3 +208,5 @@ export class ExtendedAttrs implements IExtendedAttrs {
     return this.underlineStyle === UnderlineStyle.NONE && this._urlId === 0;
   }
 }
+
+export const DEFAULT_ATTR_DATA = Object.freeze(new AttributeData());
