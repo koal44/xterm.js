@@ -237,7 +237,8 @@ export interface IBufferLine {
   resize(cols: number, fill: ICellData): boolean;
   cleanupMemory(): number;
   fill(fillCellData: ICellData, respectProtect?: boolean): void;
-  copyFrom(line: IBufferLine): void;
+  copyFrom(line: this): void;
+  copyCellsFrom(src: this, srcCol: number, destCol: number, length: number, applyInReverse: boolean): void;
   clone(): IBufferLine;
   getTrimmedLength(): number;
   getNoBgTrimmedLength(): number;

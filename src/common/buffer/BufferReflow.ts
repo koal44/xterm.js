@@ -3,7 +3,6 @@
  * @license MIT
  */
 
-import { BufferLine } from 'common/buffer/BufferLine';
 import { CircularList } from 'common/CircularList';
 import { IBufferLine, ICellData } from 'common/Types';
 
@@ -30,16 +29,16 @@ export function reflowLargerGetLinesToRemove(lines: CircularList<IBufferLine>, o
   for (let y = 0; y < lines.length - 1; y++) {
     // Check if this row is wrapped
     let i = y;
-    let nextLine = lines.get(++i) as BufferLine;
+    let nextLine = lines.get(++i)!;
     if (!nextLine.isWrapped) {
       continue;
     }
 
     // Check how many lines it's wrapped for
-    const wrappedLines: BufferLine[] = [lines.get(y) as BufferLine];
+    const wrappedLines: IBufferLine[] = [lines.get(y)!];
     while (i < lines.length && nextLine.isWrapped) {
       wrappedLines.push(nextLine);
-      nextLine = lines.get(++i) as BufferLine;
+      nextLine = lines.get(++i)!;
     }
 
     if (!reflowCursorLine) {
@@ -150,9 +149,9 @@ export function reflowLargerCreateNewLayout(lines: CircularList<IBufferLine>, to
  */
 export function reflowLargerApplyNewLayout(lines: CircularList<IBufferLine>, newLayout: number[]): void {
   // Record original lines so they don't get overridden when we rearrange the list
-  const newLayoutLines: BufferLine[] = [];
+  const newLayoutLines: IBufferLine[] = [];
   for (let i = 0; i < newLayout.length; i++) {
-    newLayoutLines.push(lines.get(newLayout[i]) as BufferLine);
+    newLayoutLines.push(lines.get(newLayout[i])!);
   }
 
   // Rearrange the list
@@ -176,7 +175,7 @@ export function reflowLargerApplyNewLayout(lines: CircularList<IBufferLine>, new
  * @param oldCols The columns before resize.
  * @param newCols The columns after resize.
  */
-export function reflowSmallerGetNewLineLengths(wrappedLines: BufferLine[], oldCols: number, newCols: number): number[] {
+export function reflowSmallerGetNewLineLengths(wrappedLines: IBufferLine[], oldCols: number, newCols: number): number[] {
   const newLineLengths: number[] = [];
   const cellsNeeded = wrappedLines.map((l, i) => getWrappedLineTrimmedLength(wrappedLines, i, oldCols)).reduce((p, c) => p + c);
 
@@ -209,7 +208,7 @@ export function reflowSmallerGetNewLineLengths(wrappedLines: BufferLine[], oldCo
   return newLineLengths;
 }
 
-export function getWrappedLineTrimmedLength(lines: BufferLine[], i: number, cols: number): number {
+export function getWrappedLineTrimmedLength(lines: IBufferLine[], i: number, cols: number): number {
   // If this is the last row in the wrapped line, get the actual trimmed length
   if (i === lines.length - 1) {
     return lines[i].getTrimmedLength();

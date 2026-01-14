@@ -48,6 +48,7 @@ export class Buffer implements IBuffer {
   private _cols: number;
   private _rows: number;
   private _isClearing: boolean = false;
+  private _lineCtor: new (cols: number, fill?: ICellData, isWrapped?: boolean) => IBufferLine;
 
   constructor(
     private _hasScrollback: boolean,
@@ -56,6 +57,7 @@ export class Buffer implements IBuffer {
   ) {
     this._cols = this._bufferService.cols;
     this._rows = this._bufferService.rows;
+    this._lineCtor = BufferLine;
     this.lines = new CircularList<IBufferLine>(this._getCorrectBufferLength(this._rows));
     this.scrollTop = 0;
     this.scrollBottom = this._rows - 1;
@@ -89,7 +91,7 @@ export class Buffer implements IBuffer {
   }
 
   public getBlankLine(attr: IAttributeData, isWrapped?: boolean): IBufferLine {
-    return new BufferLine(this._bufferService.cols, this.getNullCell(attr), isWrapped);
+    return new this._lineCtor(this._bufferService.cols, this.getNullCell(attr), isWrapped);
   }
 
   public get hasScrollback(): boolean {
@@ -188,7 +190,7 @@ export class Buffer implements IBuffer {
             if (this._optionsService.rawOptions.windowsPty.backend !== undefined || this._optionsService.rawOptions.windowsPty.buildNumber !== undefined) {
               // Just add the new missing rows on Windows as conpty reprints the screen with it's
               // view of the world. Once a line enters scrollback for conpty it remains there
-              this.lines.push(new BufferLine(newCols, nullCell));
+              this.lines.push(new this._lineCtor(newCols, nullCell));
             } else {
               if (this.ybase > 0 && this.lines.length <= this.ybase + this.y + addToY + 1) {
                 // There is room above the buffer and there are no empty elements below the line,
@@ -202,7 +204,7 @@ export class Buffer implements IBuffer {
               } else {
                 // Add a blank line if there is no buffer left at the top to scroll to, or if there
                 // are blank lines after the cursor
-                this.lines.push(new BufferLine(newCols, nullCell));
+                this.lines.push(new this._lineCtor(newCols, nullCell));
               }
             }
           }
@@ -346,7 +348,7 @@ export class Buffer implements IBuffer {
         }
         if (this.lines.length < newRows) {
           // Add an extra row at the bottom of the viewport
-          this.lines.push(new BufferLine(newCols, nullCell));
+          this.lines.push(new this._lineCtor(newCols, nullCell));
         }
       } else {
         if (this.ydisp === this.ybase) {
@@ -368,15 +370,15 @@ export class Buffer implements IBuffer {
     // Go backwards as many lines may be trimmed and this will avoid considering them
     for (let y = this.lines.length - 1; y >= 0; y--) {
       // Check whether this line is a problem
-      let nextLine = this.lines.get(y) as BufferLine;
+      let nextLine = this.lines.get(y);
       if (!nextLine || !nextLine.isWrapped && nextLine.getTrimmedLength() <= newCols) {
         continue;
       }
 
       // Gather wrapped lines and adjust y to be the starting line
-      const wrappedLines: BufferLine[] = [nextLine];
+      const wrappedLines: IBufferLine[] = [nextLine];
       while (nextLine.isWrapped && y > 0) {
-        nextLine = this.lines.get(--y) as BufferLine;
+        nextLine = this.lines.get(--y)!;
         wrappedLines.unshift(nextLine);
       }
 
@@ -401,9 +403,9 @@ export class Buffer implements IBuffer {
       }
 
       // Add the new lines
-      const newLines: BufferLine[] = [];
+      const newLines: IBufferLine[] = [];
       for (let i = 0; i < linesToAdd; i++) {
-        const newLine = this.getBlankLine(DEFAULT_ATTR_DATA, true) as BufferLine;
+        const newLine = this.getBlankLine(DEFAULT_ATTR_DATA, true);
         newLines.push(newLine);
       }
       if (newLines.length > 0) {
@@ -487,9 +489,9 @@ export class Buffer implements IBuffer {
       const insertEvents: IInsertEvent[] = [];
 
       // Record original lines so they don't get overridden when we rearrange the list
-      const originalLines: BufferLine[] = [];
+      const originalLines: IBufferLine[] = [];
       for (let i = 0; i < this.lines.length; i++) {
-        originalLines.push(this.lines.get(i) as BufferLine);
+        originalLines.push(this.lines.get(i)!);
       }
       const originalLinesLength = this.lines.length;
 

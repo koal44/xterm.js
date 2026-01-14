@@ -10,7 +10,7 @@ import { CHARSETS, DEFAULT_CHARSET } from 'common/data/Charsets';
 import { EscapeSequenceParser } from 'common/parser/EscapeSequenceParser';
 import { Disposable } from 'vs/base/common/lifecycle';
 import { StringToUtf32, stringFromCodePoint, Utf8ToUtf32 } from 'common/input/TextDecoder';
-import { BufferLine, DEFAULT_ATTR_DATA } from 'common/buffer/BufferLine';
+import { DEFAULT_ATTR_DATA } from 'common/buffer/BufferLine';
 import { IParsingState, IEscapeSequenceParser, IParams, IFunctionIdentifier } from 'common/parser/Types';
 import { NULL_CELL_CODE, NULL_CELL_WIDTH, Attributes, FgFlags, BgFlags, Content, UnderlineStyle } from 'common/buffer/Constants';
 import { CellData } from 'common/buffer/CellData';
@@ -602,10 +602,10 @@ export class InputHandler extends Disposable implements IInputHandler {
           if (!bufferRow) {
             return;
           }
-          if (oldWidth > 0 && bufferRow instanceof BufferLine) {
+          if (oldWidth > 0) {
             // Combining character widens 1 column to 2.
             // Move old character to next line.
-            bufferRow.copyCellsFrom(oldRow as BufferLine,
+            bufferRow.copyCellsFrom(oldRow,
               oldCol, 0, oldWidth, false);
           }
           // clear left over cells to the right
