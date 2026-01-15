@@ -243,6 +243,7 @@ export interface IBufferLine {
   getTrimmedLength(): number;
   getNoBgTrimmedLength(): number;
   translateToString(trimRight?: boolean, startCol?: number, endCol?: number, outColumns?: number[]): string;
+  createCell(): ICellData;
 
   /* direct access to cell attrs */
   getWidth(index: number): number;

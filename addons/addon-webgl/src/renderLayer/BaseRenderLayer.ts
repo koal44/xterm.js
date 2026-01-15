@@ -8,7 +8,7 @@ import { acquireTextureAtlas } from '../CharAtlasCache';
 import { IRenderDimensions } from 'browser/renderer/shared/Types';
 import { ICoreBrowserService, IThemeService } from 'browser/services/Services';
 import { Disposable, toDisposable } from 'vs/base/common/lifecycle';
-import { CellData } from 'common/buffer/CellData';
+import { ICellData } from 'common/Types';
 import { IOptionsService } from 'common/services/Services';
 import { Terminal } from '@xterm/xterm';
 import { IRenderLayer } from './Types';
@@ -181,7 +181,7 @@ export abstract class BaseRenderLayer extends Disposable implements IRenderLayer
    * @param x The column to draw at.
    * @param y The row to draw at.
    */
-  protected _fillCharTrueColor(terminal: Terminal, cell: CellData, x: number, y: number): void {
+  protected _fillCharTrueColor(terminal: Terminal, cell: ICellData, x: number, y: number): void {
     this._ctx.font = this._getFont(terminal, false, false);
     this._ctx.textBaseline = TEXT_BASELINE;
     this._clipCell(x, y, cell.getWidth());

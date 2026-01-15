@@ -4,7 +4,7 @@
  * @license MIT
  */
 
-import { IInputHandler, IAttributeData, IDisposable, IWindowOptions, IColorEvent, IParseStack, ColorIndex, ColorRequestType, SpecialColorIndex } from 'common/Types';
+import { IInputHandler, IAttributeData, IDisposable, IWindowOptions, IColorEvent, IParseStack, ColorIndex, ColorRequestType, SpecialColorIndex, ICellData } from 'common/Types';
 import { C0, C1 } from 'common/data/EscapeSequences';
 import { CHARSETS, DEFAULT_CHARSET } from 'common/data/Charsets';
 import { EscapeSequenceParser } from 'common/parser/EscapeSequenceParser';
@@ -12,7 +12,6 @@ import { Disposable } from 'vs/base/common/lifecycle';
 import { StringToUtf32, stringFromCodePoint, Utf8ToUtf32 } from 'common/input/TextDecoder';
 import { IParsingState, IEscapeSequenceParser, IParams, IFunctionIdentifier } from 'common/parser/Types';
 import { NULL_CELL_CODE, NULL_CELL_WIDTH, Attributes, FgFlags, BgFlags, Content, UnderlineStyle } from 'common/buffer/Constants';
-import { CellData } from 'common/buffer/CellData';
 import { AttributeData, DEFAULT_ATTR_DATA } from 'common/buffer/AttributeData';
 import { ICoreService, IBufferService, IOptionsService, ILogService, ICoreMouseService, ICharsetService, IUnicodeService, LogLevelEnum, IOscLinkService } from 'common/services/Services';
 import { UnicodeService } from 'common/services/UnicodeService';
@@ -3452,18 +3451,20 @@ export class InputHandler extends Disposable implements IInputHandler {
    * @vt: #Y   ESC   DECALN   "Screen Alignment Pattern"  "ESC # 8"  "Fill viewport with a test pattern (E)."
    */
   public screenAlignmentPattern(): boolean {
-    // prepare cell data
-    const cell = new CellData();
-    cell.content = 1 << Content.WIDTH_SHIFT | 'E'.charCodeAt(0);
-    cell.fg = this._curAttrData.fg;
-    cell.bg = this._curAttrData.bg;
-
+    let cell: ICellData | undefined;
 
     this._setCursor(0, 0);
     for (let yOffset = 0; yOffset < this._bufferService.rows; ++yOffset) {
       const row = this._activeBuffer.ybase + this._activeBuffer.y + yOffset;
       const line = this._activeBuffer.lines.get(row);
       if (line) {
+        cell ??= (() => {
+          const c = line.createCell();
+          c.content = 1 << Content.WIDTH_SHIFT | 'E'.charCodeAt(0);
+          c.fg = this._curAttrData.fg;
+          c.bg = this._curAttrData.bg;
+          return c;
+        })();
         line.fill(cell);
         line.isWrapped = false;
       }

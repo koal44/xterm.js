@@ -9,7 +9,6 @@ import { IAttributeData, IBufferLine, ICellData, ICharset } from 'common/Types';
 import { ExtendedAttrs, DEFAULT_ATTR_DATA } from 'common/buffer/AttributeData';
 import { BufferLine } from 'common/buffer/BufferLine';
 import { getWrappedLineTrimmedLength, reflowLargerApplyNewLayout, reflowLargerCreateNewLayout, reflowLargerGetLinesToRemove, reflowSmallerGetNewLineLengths } from 'common/buffer/BufferReflow';
-import { CellData } from 'common/buffer/CellData';
 import { NULL_CELL_CHAR, NULL_CELL_CODE, NULL_CELL_WIDTH, WHITESPACE_CELL_CHAR, WHITESPACE_CELL_CODE, WHITESPACE_CELL_WIDTH } from 'common/buffer/Constants';
 import { Marker } from 'common/buffer/Marker';
 import { IBuffer } from 'common/buffer/Types';
@@ -43,12 +42,13 @@ export class Buffer implements IBuffer {
   public savedOriginMode: boolean = false;
   public savedWraparoundMode: boolean = true;
   public markers: Marker[] = [];
-  private _nullCell: ICellData = CellData.fromCharData([0, NULL_CELL_CHAR, NULL_CELL_WIDTH, NULL_CELL_CODE]);
-  private _whitespaceCell: ICellData = CellData.fromCharData([0, WHITESPACE_CELL_CHAR, WHITESPACE_CELL_WIDTH, WHITESPACE_CELL_CODE]);
+  private _lineCtor!: new (cols: number, fill?: ICellData, isWrapped?: boolean) => IBufferLine;
+  private _dummyLine!: IBufferLine;
+  private _nullCell!: ICellData;
+  private _whitespaceCell!: ICellData;
   private _cols: number;
   private _rows: number;
   private _isClearing: boolean = false;
-  private _lineCtor: new (cols: number, fill?: ICellData, isWrapped?: boolean) => IBufferLine;
 
   constructor(
     private _hasScrollback: boolean,
@@ -57,11 +57,20 @@ export class Buffer implements IBuffer {
   ) {
     this._cols = this._bufferService.cols;
     this._rows = this._bufferService.rows;
-    this._lineCtor = BufferLine;
+    this.setLineCtor(BufferLine);
     this.lines = new CircularList<IBufferLine>(this._getCorrectBufferLength(this._rows));
     this.scrollTop = 0;
     this.scrollBottom = this._rows - 1;
     this.setupTabStops();
+  }
+
+  public setLineCtor(lineCtor: new (cols: number, fill?: ICellData, isWrapped?: boolean) => IBufferLine): void {
+    this._lineCtor = lineCtor;
+    this._dummyLine = new this._lineCtor(this._cols);
+    this._nullCell = this._dummyLine.createCell();
+    this._nullCell.setFromCharData([0, NULL_CELL_CHAR, NULL_CELL_WIDTH, NULL_CELL_CODE]);
+    this._whitespaceCell = this._dummyLine.createCell();
+    this._whitespaceCell.setFromCharData([0, WHITESPACE_CELL_CHAR, WHITESPACE_CELL_WIDTH, WHITESPACE_CELL_CODE]);
   }
 
   public getNullCell(attr?: IAttributeData): ICellData {
@@ -88,6 +97,10 @@ export class Buffer implements IBuffer {
       this._whitespaceCell.extended = new ExtendedAttrs();
     }
     return this._whitespaceCell;
+  }
+
+  public createCell(): ICellData {
+    return this._dummyLine.createCell();
   }
 
   public getBlankLine(attr: IAttributeData, isWrapped?: boolean): IBufferLine {

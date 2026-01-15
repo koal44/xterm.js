@@ -11,9 +11,8 @@ import { ISelectionRedrawRequestEvent, ISelectionRequestScrollLinesEvent } from 
 import { ICoreBrowserService, IMouseService, IRenderService, ISelectionService } from 'browser/services/Services';
 import { Disposable, toDisposable } from 'vs/base/common/lifecycle';
 import * as Browser from 'common/Platform';
-import { IBufferLine, IDisposable } from 'common/Types';
+import { IBufferLine, ICellData, IDisposable } from 'common/Types';
 import { getRangeLength } from 'common/buffer/BufferRange';
-import { CellData } from 'common/buffer/CellData';
 import { IBuffer } from 'common/buffer/Types';
 import { IBufferService, ICoreService, IOptionsService } from 'common/services/Services';
 import { Emitter } from 'vs/base/common/event';
@@ -104,7 +103,6 @@ export class SelectionService extends Disposable implements ISelectionService {
   private _mouseMoveListener: EventListener;
   private _mouseUpListener: EventListener;
   private _trimListener: IDisposable;
-  private _workCell: CellData = new CellData();
 
   private _mouseDownTimeStamp: number = 0;
   private _oldHasSelection: boolean = false;
@@ -781,10 +779,11 @@ export class SelectionService extends Disposable implements ISelectionService {
    * @param x The x index in the buffer line to convert.
    */
   private _convertViewportColToCharacterIndex(bufferLine: IBufferLine, x: number): number {
+    const workCell = bufferLine.createCell();
     let charIndex = x;
     for (let i = 0; x >= i; i++) {
-      const length = bufferLine.loadCell(i, this._workCell).getChars().length;
-      if (this._workCell.getWidth() === 0) {
+      const length = bufferLine.loadCell(i, workCell).getChars().length;
+      if (workCell.getWidth() === 0) {
         // Wide characters aren't included in the line string so decrement the
         // index so the index is back on the wide character.
         charIndex--;
@@ -832,6 +831,7 @@ export class SelectionService extends Disposable implements ISelectionService {
       return undefined;
     }
 
+    const workCell = bufferLine.createCell();
     const line = buffer.translateBufferLineToString(coords[1], false);
 
     // Get actual index, taking into consideration wide characters
@@ -880,10 +880,10 @@ export class SelectionService extends Disposable implements ISelectionService {
       }
 
       // Expand the string in both directions until a space is hit
-      while (startCol > 0 && startIndex > 0 && !this._isCharWordSeparator(bufferLine.loadCell(startCol - 1, this._workCell))) {
-        bufferLine.loadCell(startCol - 1, this._workCell);
-        const length = this._workCell.getChars().length;
-        if (this._workCell.getWidth() === 0) {
+      while (startCol > 0 && startIndex > 0 && !this._isCharWordSeparator(bufferLine.loadCell(startCol - 1, workCell))) {
+        bufferLine.loadCell(startCol - 1, workCell);
+        const length = workCell.getChars().length;
+        if (workCell.getWidth() === 0) {
           // If the next character is a wide char, record it and skip the column
           leftWideCharCount++;
           startCol--;
@@ -896,10 +896,10 @@ export class SelectionService extends Disposable implements ISelectionService {
         startIndex--;
         startCol--;
       }
-      while (endCol < bufferLine.length && endIndex + 1 < line.length && !this._isCharWordSeparator(bufferLine.loadCell(endCol + 1, this._workCell))) {
-        bufferLine.loadCell(endCol + 1, this._workCell);
-        const length = this._workCell.getChars().length;
-        if (this._workCell.getWidth() === 2) {
+      while (endCol < bufferLine.length && endIndex + 1 < line.length && !this._isCharWordSeparator(bufferLine.loadCell(endCol + 1, workCell))) {
+        bufferLine.loadCell(endCol + 1, workCell);
+        const length = workCell.getChars().length;
+        if (workCell.getWidth() === 2) {
           // If the next character is a wide char, record it and skip the column
           rightWideCharCount++;
           endCol++;
@@ -1021,7 +1021,7 @@ export class SelectionService extends Disposable implements ISelectionService {
    * word logic.
    * @param cell The cell to check.
    */
-  private _isCharWordSeparator(cell: CellData): boolean {
+  private _isCharWordSeparator(cell: ICellData): boolean {
     // Zero width characters are never separators as they are always to the
     // right of wide characters
     if (cell.getWidth() === 0) {

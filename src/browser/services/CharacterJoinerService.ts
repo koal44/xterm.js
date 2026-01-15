@@ -7,7 +7,6 @@ import { IBufferLine, ICellData, CharData } from 'common/Types';
 import { ICharacterJoiner } from 'browser/Types';
 import { AttributeData } from 'common/buffer/AttributeData';
 import { WHITESPACE_CELL_CHAR, Content } from 'common/buffer/Constants';
-import { CellData } from 'common/buffer/CellData';
 import { IBufferService } from 'common/services/Services';
 import { ICharacterJoinerService } from 'browser/services/Services';
 
@@ -61,7 +60,6 @@ export class CharacterJoinerService implements ICharacterJoinerService {
 
   private _characterJoiners: ICharacterJoiner[] = [];
   private _nextCharacterJoinerId: number = 0;
-  private _workCell: CellData = new CellData();
 
   constructor(
     @IBufferService private _bufferService: IBufferService
@@ -100,6 +98,7 @@ export class CharacterJoinerService implements ICharacterJoinerService {
 
     const ranges: [number, number][] = [];
     const lineStr = line.translateToString(true);
+    const workCell = line.createCell();
 
     // Because some cells can be represented by multiple javascript characters,
     // we track the cell and the string indexes separately. This allows us to
@@ -112,15 +111,15 @@ export class CharacterJoinerService implements ICharacterJoinerService {
     let rangeAttrBG = line.getBg(0);
 
     for (let x = 0; x < line.getTrimmedLength(); x++) {
-      line.loadCell(x, this._workCell);
+      line.loadCell(x, workCell);
 
-      if (this._workCell.getWidth() === 0) {
+      if (workCell.getWidth() === 0) {
         // If this character is of width 0, skip it.
         continue;
       }
 
       // End of range
-      if (this._workCell.fg !== rangeAttrFG || this._workCell.bg !== rangeAttrBG) {
+      if (workCell.fg !== rangeAttrFG || workCell.bg !== rangeAttrBG) {
         // If we ended up with a sequence of more than one character,
         // look for ranges to join.
         if (x - rangeStartColumn > 1) {
@@ -139,11 +138,11 @@ export class CharacterJoinerService implements ICharacterJoinerService {
         // Reset our markers for a new range.
         rangeStartColumn = x;
         rangeStartStringIndex = currentStringIndex;
-        rangeAttrFG = this._workCell.fg;
-        rangeAttrBG = this._workCell.bg;
+        rangeAttrFG = workCell.fg;
+        rangeAttrBG = workCell.bg;
       }
 
-      currentStringIndex += this._workCell.getChars().length || WHITESPACE_CELL_CHAR.length;
+      currentStringIndex += workCell.getChars().length || WHITESPACE_CELL_CHAR.length;
     }
 
     // Process any trailing ranges.

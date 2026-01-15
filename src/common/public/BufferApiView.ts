@@ -6,7 +6,6 @@
 import { IBuffer as IBufferApi, IBufferLine as IBufferLineApi, IBufferCell as IBufferCellApi } from '@xterm/xterm';
 import { IBuffer } from 'common/buffer/Types';
 import { BufferLineApiView } from 'common/public/BufferLineApiView';
-import { CellData } from 'common/buffer/CellData';
 
 export class BufferApiView implements IBufferApi {
   constructor(
@@ -31,5 +30,5 @@ export class BufferApiView implements IBufferApi {
     }
     return new BufferLineApiView(line);
   }
-  public getNullCell(): IBufferCellApi { return new CellData(); }
+  public getNullCell(): IBufferCellApi { return this._buffer.createCell(); }
 }

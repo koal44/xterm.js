@@ -35,6 +35,7 @@ export interface IBuffer {
   prevStop(x?: number): number;
   getBlankLine(attr: IAttributeData, isWrapped?: boolean): IBufferLine;
   getNullCell(attr?: IAttributeData): ICellData;
+  createCell(): ICellData;
   getWhitespaceCell(attr?: IAttributeData): ICellData;
   addMarker(y: number): IMarker;
   clearMarkers(y: number): void;

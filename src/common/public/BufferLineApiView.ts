@@ -3,7 +3,6 @@
  * @license MIT
  */
 
-import { CellData } from 'common/buffer/CellData';
 import { IBufferLine, ICellData } from 'common/Types';
 import { IBufferCell as IBufferCellApi, IBufferLine as IBufferLineApi } from '@xterm/xterm';
 
@@ -21,7 +20,7 @@ export class BufferLineApiView implements IBufferLineApi {
       this._line.loadCell(x, cell as ICellData);
       return cell;
     }
-    return this._line.loadCell(x, new CellData());
+    return this._line.loadCell(x, this._line.createCell());
   }
   public translateToString(trimRight?: boolean, startColumn?: number, endColumn?: number): string {
     return this._line.translateToString(trimRight, startColumn, endColumn);

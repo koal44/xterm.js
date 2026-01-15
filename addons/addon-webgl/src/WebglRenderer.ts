@@ -12,7 +12,6 @@ import { IRenderDimensions, IRenderer, IRequestRedrawEvent } from 'browser/rende
 import { ICharSizeService, ICharacterJoinerService, ICoreBrowserService, IThemeService } from 'browser/services/Services';
 import { CharData, IBufferLine, ICellData } from 'common/Types';
 import { AttributeData } from 'common/buffer/AttributeData';
-import { CellData } from 'common/buffer/CellData';
 import { Attributes, Content, NULL_CELL_CHAR, NULL_CELL_CODE } from 'common/buffer/Constants';
 import { ICoreService, IDecorationService, IOptionsService } from 'common/services/Services';
 import { Terminal } from '@xterm/xterm';
@@ -37,8 +36,6 @@ export class WebglRenderer extends Disposable implements IRenderer {
   private _observerDisposable = this._register(new MutableDisposable());
 
   private _model: RenderModel = new RenderModel();
-  private _workCell: ICellData = new CellData();
-  private _workCell2: ICellData = new CellData();
   private _cellColorResolver: CellColorResolver;
 
   private _canvas: HTMLCanvasElement;
@@ -381,7 +378,8 @@ export class WebglRenderer extends Disposable implements IRenderer {
 
   private _updateModel(start: number, end: number): void {
     const terminal = this._core;
-    let cell: ICellData = this._workCell;
+    let workCell: ICellData;
+    let cell: ICellData;
 
     // Declare variable ahead of time to avoid garbage collection
     let lastBg: number;
@@ -420,6 +418,8 @@ export class WebglRenderer extends Disposable implements IRenderer {
     for (y = start; y <= end; y++) {
       row = y + terminal.buffer.ydisp;
       line = terminal.buffer.lines.get(row)!;
+      workCell ??= line.createCell();
+      cell = workCell;
       this._model.lineLengths[y] = 0;
       isCursorRow = cursorY === row;
       skipJoinedCheckUntilX = 0;
@@ -536,7 +536,7 @@ export class WebglRenderer extends Disposable implements IRenderer {
 
         if (isJoined) {
           // Restore work cell
-          cell = this._workCell;
+          cell = workCell;
 
           // Null out non-first cells
           for (x++; x <= lastCharX; x++) {

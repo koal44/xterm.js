@@ -545,4 +545,8 @@ export class BufferLine implements IBufferLine {
     }
     return result;
   }
+
+  public createCell(): ICellData {
+    return new CellData();
+  }
 }

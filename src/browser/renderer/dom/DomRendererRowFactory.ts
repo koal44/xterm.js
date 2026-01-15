@@ -6,7 +6,6 @@
 import { IBufferLine, ICellData, IColor } from 'common/Types';
 import { INVERTED_DEFAULT_COLOR } from 'browser/renderer/shared/Constants';
 import { WHITESPACE_CELL_CHAR, Attributes } from 'common/buffer/Constants';
-import { CellData } from 'common/buffer/CellData';
 import { ICoreService, IDecorationService, IOptionsService } from 'common/services/Services';
 import { channels, color } from 'common/Color';
 import { ICharacterJoinerService, ICoreBrowserService, IThemeService } from 'browser/services/Services';
@@ -34,8 +33,6 @@ export const enum RowCss {
 
 
 export class DomRendererRowFactory {
-  private _workCell: CellData = new CellData();
-
   private _selectionStart: [number, number] | undefined;
   private _selectionEnd: [number, number] | undefined;
   private _columnSelectMode: boolean = false;
@@ -96,10 +93,11 @@ export class DomRendererRowFactory {
     const classes: string[] = [];
 
     const hasHover = linkStart !== -1 && linkEnd !== -1;
+    const workCell = lineData.createCell();
 
     for (let x = 0; x < lineLength; x++) {
-      lineData.loadCell(x, this._workCell);
-      let width = this._workCell.getWidth();
+      lineData.loadCell(x, workCell);
+      let width = workCell.getWidth();
 
       // The character to the left is a wide character, drawing is owned by the char at x-1
       if (width === 0) {
@@ -118,7 +116,7 @@ export class DomRendererRowFactory {
       // Process any joined character ranges as needed. Because of how the
       // ranges are produced, we know that they are valid for the characters
       // and attributes of our input.
-      let cell = this._workCell;
+      let cell = workCell;
       if (joinedRanges.length > 0 && x === joinedRanges[0][0] && isValidJoinRange) {
         const range = joinedRanges.shift()!;
         // If the ligature's selection state is not consistent, don't join it. This helps the
@@ -137,7 +135,7 @@ export class DomRendererRowFactory {
           // We already know the exact start and end column of the joined range,
           // so we get the string and width representing it directly
           cell = new JoinedCellData(
-            this._workCell,
+            workCell,
             lineData.translateToString(true, range[0], range[1]),
             range[1] - range[0]
           );
