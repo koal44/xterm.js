@@ -5,23 +5,34 @@
 import { NULL_CELL_CHAR, NULL_CELL_WIDTH, NULL_CELL_CODE, DEFAULT_ATTR, Content, UnderlineStyle, BgFlags, Attributes, FgFlags } from 'common/buffer/Constants';
 import { BufferLine } from 'common/buffer//BufferLine';
 import { CellData } from 'common/buffer/CellData';
-import { CharData, IBufferLine } from '../Types';
+import { IBufferLine } from '../Types';
 import { assert } from 'chai';
 import { AttributeData } from 'common/buffer/AttributeData';
 
+type CellSnapshot = readonly [fg: number, chars: string, width: number, code: number];
 
 class TestBufferLine extends BufferLine {
   public get combined(): {[index: number]: string} {
     return this._combined;
   }
 
-  public toArray(): CharData[] {
-    const result = [];
+  public toArray(): CellSnapshot[] {
+    const result: CellSnapshot[] = [];
+    const workCell = new CellData();
     for (let i = 0; i < this.length; ++i) {
-      result.push(this.loadCell(i, new CellData()).getAsCharData());
+      result.push(loadSnap(this, i, workCell));
     }
     return result;
   }
+}
+
+function snapCell(cell: CellData): CellSnapshot {
+  return [cell.fg, cell.getChars(), cell.getWidth(), cell.getCode()];
+}
+
+function loadSnap(line: IBufferLine, x: number, work = new CellData()): CellSnapshot {
+  line.loadCell(x, work);
+  return snapCell(work);
 }
 
 describe('AttributeData', () => {
@@ -135,27 +146,27 @@ describe('AttributeData', () => {
 });
 
 describe('CellData', () => {
-  it('CharData <--> CellData equality', () => {
-    const cell = new CellData();
+  it('CellSnapshot <--> CellData equality', () => {
+    let cell: CellData;
     // ASCII
-    cell.setFromCharData([123, 'a', 1, 'a'.charCodeAt(0)]);
-    assert.deepEqual(cell.getAsCharData(), [123, 'a', 1, 'a'.charCodeAt(0)]);
+    cell = CellData.fromCharData([123, 'a', 1]);
+    assert.deepEqual(snapCell(cell as CellData), [123, 'a', 1, 'a'.charCodeAt(0)]);
     assert.equal(cell.isCombined(), 0);
     // combining
-    cell.setFromCharData([123, 'e\u0301', 1, '\u0301'.charCodeAt(0)]);
-    assert.deepEqual(cell.getAsCharData(), [123, 'e\u0301', 1, '\u0301'.charCodeAt(0)]);
+    cell = CellData.fromCharData([123, 'e\u0301', 1]);
+    assert.deepEqual(snapCell(cell as CellData), [123, 'e\u0301', 1, '\u0301'.charCodeAt(0)]);
     assert.equal(cell.isCombined(), Content.IS_COMBINED_MASK);
     // surrogate
-    cell.setFromCharData([123, '𝄞', 1, 0x1D11E]);
-    assert.deepEqual(cell.getAsCharData(), [123, '𝄞', 1, 0x1D11E]);
+    cell = CellData.fromCharData([123, '𝄞', 1]);
+    assert.deepEqual(snapCell(cell as CellData), [123, '𝄞', 1, 0x1D11E]);
     assert.equal(cell.isCombined(), 0);
     // surrogate + combining
-    cell.setFromCharData([123, '𓂀\u0301', 1, '𓂀\u0301'.charCodeAt(2)]);
-    assert.deepEqual(cell.getAsCharData(), [123, '𓂀\u0301', 1, '𓂀\u0301'.charCodeAt(2)]);
+    cell = CellData.fromCharData([123, '𓂀\u0301', 1]);
+    assert.deepEqual(snapCell(cell as CellData), [123, '𓂀\u0301', 1, '𓂀\u0301'.charCodeAt(2)]);
     assert.equal(cell.isCombined(), Content.IS_COMBINED_MASK);
     // wide char
-    cell.setFromCharData([123, '１', 2, '１'.charCodeAt(0)]);
-    assert.deepEqual(cell.getAsCharData(), [123, '１', 2, '１'.charCodeAt(0)]);
+    cell = CellData.fromCharData([123, '１', 2]);
+    assert.deepEqual(snapCell(cell as CellData), [123, '１', 2, '１'.charCodeAt(0)]);
     assert.equal(cell.isCombined(), 0);
   });
 });
@@ -167,15 +178,15 @@ describe('BufferLine', function(): void {
     assert.equal(line.isWrapped, false);
     line = new TestBufferLine(10);
     assert.equal(line.length, 10);
-    assert.deepEqual(line.loadCell(0, new CellData()).getAsCharData(), [0, NULL_CELL_CHAR, NULL_CELL_WIDTH, NULL_CELL_CODE]);
+    assert.deepEqual(loadSnap(line, 0), [0, NULL_CELL_CHAR, NULL_CELL_WIDTH, NULL_CELL_CODE]);
     assert.equal(line.isWrapped, false);
     line = new TestBufferLine(10, undefined, true);
     assert.equal(line.length, 10);
-    assert.deepEqual(line.loadCell(0, new CellData()).getAsCharData(), [0, NULL_CELL_CHAR, NULL_CELL_WIDTH, NULL_CELL_CODE]);
+    assert.deepEqual(loadSnap(line, 0), [0, NULL_CELL_CHAR, NULL_CELL_WIDTH, NULL_CELL_CODE]);
     assert.equal(line.isWrapped, true);
     line = new TestBufferLine(10, CellData.fromCharData([123, 'a', 456, 'a'.charCodeAt(0)]), true);
     assert.equal(line.length, 10);
-    assert.deepEqual(line.loadCell(0, new CellData()).getAsCharData(), [123, 'a', 456, 'a'.charCodeAt(0)]);
+    assert.deepEqual(loadSnap(line, 0), [123, 'a', 456, 'a'.charCodeAt(0)]);
     assert.equal(line.isWrapped, true);
   });
   it('insertCells', function(): void {
@@ -298,14 +309,14 @@ describe('BufferLine', function(): void {
     });
     it('should remove combining data on replaced cells after shrinking then enlarging', () => {
       const line = new TestBufferLine(10, CellData.fromCharData([1, 'a', 0, 'a'.charCodeAt(0)]), false);
-      line.set(2, [ 0, '😁', 1, '😁'.charCodeAt(0) ]);
-      line.set(9, [ 0, '😁', 1, '😁'.charCodeAt(0) ]);
-      assert.equal(line.translateToString(), 'aa😁aaaaaa😁');
+      line.setCell(2, CellData.fromCharData([0, '𓂀\u0301', 1]));
+      line.setCell(9, CellData.fromCharData([0, '𓂀\u0301', 1]));
+      assert.equal(line.translateToString(), 'aa𓂀\u0301aaaaaa𓂀\u0301');
       assert.equal(Object.keys(line.combined).length, 2);
       line.resize(5, CellData.fromCharData([1, 'a', 0, 'a'.charCodeAt(0)]));
-      assert.equal(line.translateToString(), 'aa😁aa');
+      assert.equal(line.translateToString(), 'aa𓂀\u0301aa');
       line.resize(10, CellData.fromCharData([1, 'a', 0, 'a'.charCodeAt(0)]));
-      assert.equal(line.translateToString(), 'aa😁aaaaaaa');
+      assert.equal(line.translateToString(), 'aa𓂀\u0301aaaaaaa');
       assert.equal(Object.keys(line.combined).length, 1);
     });
   });
@@ -478,33 +489,31 @@ describe('BufferLine', function(): void {
       const cell = line.loadCell(0, new CellData());
       // chars contains single combining char
       // width is set to 1
-      assert.deepEqual(cell.getAsCharData(), [DEFAULT_ATTR, '\u0301', 1, 0x0301]);
+      assert.deepEqual(snapCell(cell as CellData), [DEFAULT_ATTR, '\u0301', 1, 0x0301]);
       // do not account a single combining char as combined
       assert.equal(cell.isCombined(), 0);
     });
     it('should add char to combining string in cell', () => {
       const line = new TestBufferLine(3, CellData.fromCharData([DEFAULT_ATTR, NULL_CELL_CHAR, NULL_CELL_WIDTH, NULL_CELL_CODE]), false);
-      const cell = line .loadCell(0, new CellData());
-      cell.setFromCharData([123, 'e\u0301', 1, 'e\u0301'.charCodeAt(1)]);
+      const cell = CellData.fromCharData([123, 'e\u0301', 1]);
       line.setCell(0, cell);
       line.addCodepointToCell(0, '\u0301'.charCodeAt(0), 0);
       line.loadCell(0, cell);
       // chars contains 3 chars
       // width is set to 1
-      assert.deepEqual(cell.getAsCharData(), [123, 'e\u0301\u0301', 1, 0x0301]);
+      assert.deepEqual(snapCell(cell as CellData), [123, 'e\u0301\u0301', 1, 0x0301]);
       // do not account a single combining char as combined
       assert.equal(cell.isCombined(), Content.IS_COMBINED_MASK);
     });
     it('should create combining string on taken cell', () => {
       const line = new TestBufferLine(3, CellData.fromCharData([DEFAULT_ATTR, NULL_CELL_CHAR, NULL_CELL_WIDTH, NULL_CELL_CODE]), false);
-      const cell = line .loadCell(0, new CellData());
-      cell.setFromCharData([123, 'e', 1, 'e'.charCodeAt(1)]);
+      const cell = CellData.fromCharData([123, 'e', 1]);
       line.setCell(0, cell);
       line.addCodepointToCell(0, '\u0301'.charCodeAt(0), 0);
       line.loadCell(0, cell);
       // chars contains 2 chars
       // width is set to 1
-      assert.deepEqual(cell.getAsCharData(), [123, 'e\u0301', 1, 0x0301]);
+      assert.deepEqual(snapCell(cell as CellData), [123, 'e\u0301', 1, 0x0301]);
       // do not account a single combining char as combined
       assert.equal(cell.isCombined(), Content.IS_COMBINED_MASK);
     });

@@ -3,7 +3,7 @@
  * @license MIT
  */
 
-import { CHAR_DATA_CODE_INDEX, NULL_CELL_CODE, WHITESPACE_CELL_CODE } from 'common/buffer/Constants';
+import { NULL_CELL_CODE, WHITESPACE_CELL_CODE } from 'common/buffer/Constants';
 import { IBufferService } from 'common/services/Services';
 
 export function updateWindowsModeWrappedState(bufferService: IBufferService): void {
@@ -18,10 +18,10 @@ export function updateWindowsModeWrappedState(bufferService: IBufferService): vo
   // Windows when text reaches the end of the terminal it's likely going to be
   // wrapped.
   const line = bufferService.buffer.lines.get(bufferService.buffer.ybase + bufferService.buffer.y - 1);
-  const lastChar = line?.get(bufferService.cols - 1);
-
   const nextLine = bufferService.buffer.lines.get(bufferService.buffer.ybase + bufferService.buffer.y);
-  if (nextLine && lastChar) {
-    nextLine.isWrapped = (lastChar[CHAR_DATA_CODE_INDEX] !== NULL_CELL_CODE && lastChar[CHAR_DATA_CODE_INDEX] !== WHITESPACE_CELL_CODE);
+
+  if (nextLine && line) {
+    const lastCode = line.getCodePoint(bufferService.cols - 1);
+    nextLine.isWrapped = (lastCode !== NULL_CELL_CODE && lastCode !== WHITESPACE_CELL_CODE);
   }
 }

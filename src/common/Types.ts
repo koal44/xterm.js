@@ -101,8 +101,6 @@ export interface ICharset {
   [key: string]: string | undefined;
 }
 
-export type CharData = [number, string, number, number];
-
 export interface IColor {
   readonly css: string;
   readonly rgba: number; // 32-bit int with rgba in each byte
@@ -215,8 +213,6 @@ export interface ICellData extends IAttributeData {
   getWidth(): number;
   getChars(): string;
   getCode(): number;
-  setFromCharData(value: CharData): void;
-  getAsCharData(): CharData;
 }
 
 /**
@@ -225,8 +221,6 @@ export interface ICellData extends IAttributeData {
 export interface IBufferLine {
   length: number;
   isWrapped: boolean;
-  get(index: number): CharData;
-  set(index: number, value: CharData): void;
   loadCell(index: number, cell: ICellData): ICellData;
   setCell(index: number, cell: ICellData): void;
   setCellFromCodepoint(index: number, codePoint: number, width: number, attrs: IAttributeData): void;
@@ -244,6 +238,8 @@ export interface IBufferLine {
   getNoBgTrimmedLength(): number;
   translateToString(trimRight?: boolean, startCol?: number, endCol?: number, outColumns?: number[]): string;
   createCell(): ICellData;
+  createNullCell(attr?: IAttributeData): ICellData;
+  createWhitespaceCell(attr?: IAttributeData): ICellData;
 
   /* direct access to cell attrs */
   getWidth(index: number): number;

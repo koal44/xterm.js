@@ -3,7 +3,7 @@
  * @license MIT
  */
 
-import { CharData, IColor, ICoreTerminal, ITerminalOptions } from 'common/Types';
+import { IColor, ICoreTerminal, ITerminalOptions } from 'common/Types';
 import { IBuffer } from 'common/buffer/Types';
 import { IDisposable, IRenderDimensions as IRenderDimensionsApi, Terminal as ITerminalApi } from '@xterm/xterm';
 import { channels, css } from 'common/Color';
@@ -35,8 +35,6 @@ export interface ITerminal extends InternalPassthroughApis, ICoreTerminal {
 
 export type CustomKeyEventHandler = (event: KeyboardEvent) => boolean;
 export type CustomWheelEventHandler = (event: WheelEvent) => boolean;
-
-export type LineData = CharData[];
 
 export interface ICompositionHelper {
   readonly isComposing: boolean;

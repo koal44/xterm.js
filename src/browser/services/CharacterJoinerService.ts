@@ -3,7 +3,7 @@
  * @license MIT
  */
 
-import { IBufferLine, ICellData, CharData } from 'common/Types';
+import { IBufferLine, ICellData } from 'common/Types';
 import { ICharacterJoiner } from 'browser/Types';
 import { AttributeData } from 'common/buffer/AttributeData';
 import { WHITESPACE_CELL_CHAR, Content } from 'common/buffer/Constants';
@@ -44,14 +44,6 @@ export class JoinedCellData extends AttributeData implements ICellData {
     // code always gets the highest possible fake codepoint (read as -1)
     // this is needed as code is used by caches as identifier
     return 0x1FFFFF;
-  }
-
-  public setFromCharData(value: CharData): void {
-    throw new Error('not implemented');
-  }
-
-  public getAsCharData(): CharData {
-    return [this.fg, this.getChars(), this.getWidth(), this.getCode()];
   }
 }
 

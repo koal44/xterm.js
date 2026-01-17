@@ -9,7 +9,6 @@ import { IAttributeData, IBufferLine, ICellData, ICharset } from 'common/Types';
 import { ExtendedAttrs, DEFAULT_ATTR_DATA } from 'common/buffer/AttributeData';
 import { BufferLine } from 'common/buffer/BufferLine';
 import { getWrappedLineTrimmedLength, reflowLargerApplyNewLayout, reflowLargerCreateNewLayout, reflowLargerGetLinesToRemove, reflowSmallerGetNewLineLengths } from 'common/buffer/BufferReflow';
-import { NULL_CELL_CHAR, NULL_CELL_CODE, NULL_CELL_WIDTH, WHITESPACE_CELL_CHAR, WHITESPACE_CELL_CODE, WHITESPACE_CELL_WIDTH } from 'common/buffer/Constants';
 import { Marker } from 'common/buffer/Marker';
 import { IBuffer } from 'common/buffer/Types';
 import { DEFAULT_CHARSET } from 'common/data/Charsets';
@@ -67,10 +66,8 @@ export class Buffer implements IBuffer {
   public setLineCtor(lineCtor: new (cols: number, fill?: ICellData, isWrapped?: boolean) => IBufferLine): void {
     this._lineCtor = lineCtor;
     this._dummyLine = new this._lineCtor(this._cols);
-    this._nullCell = this._dummyLine.createCell();
-    this._nullCell.setFromCharData([0, NULL_CELL_CHAR, NULL_CELL_WIDTH, NULL_CELL_CODE]);
-    this._whitespaceCell = this._dummyLine.createCell();
-    this._whitespaceCell.setFromCharData([0, WHITESPACE_CELL_CHAR, WHITESPACE_CELL_WIDTH, WHITESPACE_CELL_CODE]);
+    this._nullCell = this._dummyLine.createNullCell();
+    this._whitespaceCell = this._dummyLine.createWhitespaceCell();
   }
 
   public getNullCell(attr?: IAttributeData): ICellData {

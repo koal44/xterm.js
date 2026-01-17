@@ -3,19 +3,22 @@
  * @license MIT
  */
 
-import { CharData, ICellData, IExtendedAttrs } from 'common/Types';
+import { ICellData, IExtendedAttrs } from 'common/Types';
 import { stringFromCodePoint } from 'common/input/TextDecoder';
-import { CHAR_DATA_CHAR_INDEX, CHAR_DATA_WIDTH_INDEX, CHAR_DATA_ATTR_INDEX, Content } from 'common/buffer/Constants';
+import { Content } from 'common/buffer/Constants';
 import { AttributeData, ExtendedAttrs } from 'common/buffer/AttributeData';
 
 /**
  * CellData - represents a single Cell in the terminal buffer.
  */
 export class CellData extends AttributeData implements ICellData {
-  /** Helper to create CellData from CharData. */
-  public static fromCharData(value: CharData): CellData {
+  /** Helper for test function to create CellData from CharData. */
+  public static fromCharData(value: [fg: number, chars: string, width: number, _code?: number]): CellData {
+    const [fg, chars, width] = value;
     const obj = new CellData();
-    obj.setFromCharData(value);
+    obj.fg = fg;
+    obj.bg = 0;
+    obj.encodeContent(chars, width);
     return obj;
   }
   /** Primitives from terminal buffer. */
@@ -53,23 +56,22 @@ export class CellData extends AttributeData implements ICellData {
       ? this.combinedData.charCodeAt(this.combinedData.length - 1)
       : this.content & Content.CODEPOINT_MASK;
   }
-  /** Set data from CharData */
-  public setFromCharData(value: CharData): void {
-    this.fg = value[CHAR_DATA_ATTR_INDEX];
-    this.bg = 0;
+  /** Encode content from string and width. */
+  public encodeContent(chars: string, width: number): void {
+    this.combinedData = '';
     let combined = false;
     // surrogates and combined strings need special treatment
-    if (value[CHAR_DATA_CHAR_INDEX].length > 2) {
+    if (chars.length > 2) {
       combined = true;
     }
-    else if (value[CHAR_DATA_CHAR_INDEX].length === 2) {
-      const code = value[CHAR_DATA_CHAR_INDEX].charCodeAt(0);
+    else if (chars.length === 2) {
+      const code = chars.charCodeAt(0);
       // if the 2-char string is a surrogate create single codepoint
       // everything else is combined
       if (0xD800 <= code && code <= 0xDBFF) {
-        const second = value[CHAR_DATA_CHAR_INDEX].charCodeAt(1);
+        const second = chars.charCodeAt(1);
         if (0xDC00 <= second && second <= 0xDFFF) {
-          this.content = ((code - 0xD800) * 0x400 + second - 0xDC00 + 0x10000) | (value[CHAR_DATA_WIDTH_INDEX] << Content.WIDTH_SHIFT);
+          this.content = ((code - 0xD800) * 0x400 + second - 0xDC00 + 0x10000) | (width << Content.WIDTH_SHIFT);
         }
         else {
           combined = true;
@@ -79,16 +81,15 @@ export class CellData extends AttributeData implements ICellData {
         combined = true;
       }
     }
-    else {
-      this.content = value[CHAR_DATA_CHAR_INDEX].charCodeAt(0) | (value[CHAR_DATA_WIDTH_INDEX] << Content.WIDTH_SHIFT);
+    else if (chars.length === 1) {
+      this.content = chars.charCodeAt(0) | (width << Content.WIDTH_SHIFT);
+    }
+    else { // empty string
+      this.content = 0 | (width << Content.WIDTH_SHIFT);
     }
     if (combined) {
-      this.combinedData = value[CHAR_DATA_CHAR_INDEX];
-      this.content = Content.IS_COMBINED_MASK | (value[CHAR_DATA_WIDTH_INDEX] << Content.WIDTH_SHIFT);
+      this.combinedData = chars;
+      this.content = Content.IS_COMBINED_MASK | (width << Content.WIDTH_SHIFT);
     }
-  }
-  /** Get data as CharData. */
-  public getAsCharData(): CharData {
-    return [this.fg, this.getChars(), this.getWidth(), this.getCode()];
   }
 }

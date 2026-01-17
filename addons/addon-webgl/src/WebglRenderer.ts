@@ -10,7 +10,7 @@ import { CursorBlinkStateManager } from './CursorBlinkStateManager';
 import { observeDevicePixelDimensions } from './DevicePixelObserver';
 import { IRenderDimensions, IRenderer, IRequestRedrawEvent } from 'browser/renderer/shared/Types';
 import { ICharSizeService, ICharacterJoinerService, ICoreBrowserService, IThemeService } from 'browser/services/Services';
-import { CharData, IBufferLine, ICellData } from 'common/Types';
+import { IBufferLine, ICellData } from 'common/Types';
 import { AttributeData } from 'common/buffer/AttributeData';
 import { Attributes, Content, NULL_CELL_CHAR, NULL_CELL_CODE } from 'common/buffer/Constants';
 import { ICoreService, IDecorationService, IOptionsService } from 'common/services/Services';
@@ -673,14 +673,6 @@ export class JoinedCellData extends AttributeData implements ICellData {
     // code always gets the highest possible fake codepoint (read as -1)
     // this is needed as code is used by caches as identifier
     return 0x1FFFFF;
-  }
-
-  public setFromCharData(value: CharData): void {
-    throw new Error('not implemented');
-  }
-
-  public getAsCharData(): CharData {
-    return [this.fg, this.getChars(), this.getWidth(), this.getCode()];
   }
 }
 

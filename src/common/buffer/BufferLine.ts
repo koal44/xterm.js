@@ -3,9 +3,9 @@
  * @license MIT
  */
 
-import { CharData, IAttributeData, IBufferLine, ICellData, IExtendedAttrs } from 'common/Types';
+import { IAttributeData, IBufferLine, ICellData, IExtendedAttrs } from 'common/Types';
 import { CellData } from 'common/buffer/CellData';
-import { Attributes, BgFlags, CHAR_DATA_ATTR_INDEX, CHAR_DATA_CHAR_INDEX, CHAR_DATA_WIDTH_INDEX, Content, NULL_CELL_CHAR, NULL_CELL_CODE, NULL_CELL_WIDTH, WHITESPACE_CELL_CHAR } from 'common/buffer/Constants';
+import { Attributes, BgFlags, Content, NULL_CELL_CHAR, NULL_CELL_WIDTH, WHITESPACE_CELL_CHAR, WHITESPACE_CELL_WIDTH } from 'common/buffer/Constants';
 import { stringFromCodePoint } from 'common/input/TextDecoder';
 
 /**
@@ -49,7 +49,6 @@ const CLEANUP_THRESHOLD = 2;
  *   Used during normal input in `InputHandler` for faster buffer access.
  * - `setCell`
  *   This method takes a CellData object and stores the data in the buffer.
- *   Use `CellData.fromCharData` to create the CellData object (e.g. from JS string).
  *
  * To retrieve data from the buffer use either one of the primitive methods
  * (if only one particular value is needed) or `loadCell`. For `loadCell` in a loop
@@ -63,44 +62,11 @@ export class BufferLine implements IBufferLine {
 
   constructor(cols: number, fillCellData?: ICellData, public isWrapped: boolean = false) {
     this._data = new Uint32Array(cols * CELL_SIZE);
-    const cell = fillCellData || CellData.fromCharData([0, NULL_CELL_CHAR, NULL_CELL_WIDTH, NULL_CELL_CODE]);
+    const cell = fillCellData ?? this.createNullCell();
     for (let i = 0; i < cols; ++i) {
       this.setCell(i, cell);
     }
     this.length = cols;
-  }
-
-  /**
-   * Get cell data CharData.
-   * @deprecated
-   */
-  public get(index: number): CharData {
-    const content = this._data[index * CELL_SIZE + Cell.CONTENT];
-    const cp = content & Content.CODEPOINT_MASK;
-    return [
-      this._data[index * CELL_SIZE + Cell.FG],
-      (content & Content.IS_COMBINED_MASK)
-        ? this._combined[index]
-        : (cp) ? stringFromCodePoint(cp) : '',
-      content >> Content.WIDTH_SHIFT,
-      (content & Content.IS_COMBINED_MASK)
-        ? this._combined[index].charCodeAt(this._combined[index].length - 1)
-        : cp
-    ];
-  }
-
-  /**
-   * Set cell data from CharData.
-   * @deprecated
-   */
-  public set(index: number, value: CharData): void {
-    this._data[index * CELL_SIZE + Cell.FG] = value[CHAR_DATA_ATTR_INDEX];
-    if (value[CHAR_DATA_CHAR_INDEX].length > 1) {
-      this._combined[index] = value[1];
-      this._data[index * CELL_SIZE + Cell.CONTENT] = index | Content.IS_COMBINED_MASK | (value[CHAR_DATA_WIDTH_INDEX] << Content.WIDTH_SHIFT);
-    } else {
-      this._data[index * CELL_SIZE + Cell.CONTENT] = value[CHAR_DATA_CHAR_INDEX].charCodeAt(0) | (value[CHAR_DATA_WIDTH_INDEX] << Content.WIDTH_SHIFT);
-    }
   }
 
   /**
@@ -402,7 +368,7 @@ export class BufferLine implements IBufferLine {
     return 0;
   }
 
-  /** fill a line with fillCharData */
+  /** fill a line with fillCellData */
   public fill(fillCellData: ICellData, respectProtect: boolean = false): void {
     // full branching on respectProtect==true, hopefully getting fast JIT for standard case
     if (respectProtect) {
@@ -546,7 +512,27 @@ export class BufferLine implements IBufferLine {
     return result;
   }
 
-  public createCell(): ICellData {
+  public createCell(): CellData {
     return new CellData();
+  }
+
+  public createNullCell(attr?: IAttributeData): ICellData {
+    const cell = this.createCell();
+    if (attr) {
+      cell.fg = attr.fg;
+      cell.bg = attr.bg;
+    }
+    cell.encodeContent(NULL_CELL_CHAR, NULL_CELL_WIDTH);
+    return cell;
+  }
+
+  public createWhitespaceCell(attr?: IAttributeData): ICellData {
+    const cell = this.createCell();
+    if (attr) {
+      cell.fg = attr.fg;
+      cell.bg = attr.bg;
+    }
+    cell.encodeContent(WHITESPACE_CELL_CHAR, WHITESPACE_CELL_WIDTH);
+    return cell;
   }
 }
