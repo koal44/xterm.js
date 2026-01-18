@@ -11,7 +11,7 @@ import { EscapeSequenceParser } from 'common/parser/EscapeSequenceParser';
 import { Disposable } from 'vs/base/common/lifecycle';
 import { StringToUtf32, stringFromCodePoint, Utf8ToUtf32 } from 'common/input/TextDecoder';
 import { IParsingState, IEscapeSequenceParser, IParams, IFunctionIdentifier } from 'common/parser/Types';
-import { NULL_CELL_CODE, NULL_CELL_WIDTH, Attributes, FgFlags, BgFlags, Content, UnderlineStyle } from 'common/buffer/Constants';
+import { NULL_CELL_CODE, NULL_CELL_WIDTH, Attributes, FgFlags, BgFlags, UnderlineStyle } from 'common/buffer/Constants';
 import { AttributeData, DEFAULT_ATTR_DATA } from 'common/buffer/AttributeData';
 import { ICoreService, IBufferService, IOptionsService, ILogService, ICoreMouseService, ICharsetService, IUnicodeService, LogLevelEnum, IOscLinkService } from 'common/services/Services';
 import { UnicodeService } from 'common/services/UnicodeService';
@@ -3457,17 +3457,11 @@ export class InputHandler extends Disposable implements IInputHandler {
     for (let yOffset = 0; yOffset < this._bufferService.rows; ++yOffset) {
       const row = this._activeBuffer.ybase + this._activeBuffer.y + yOffset;
       const line = this._activeBuffer.lines.get(row);
-      if (line) {
-        cell ??= (() => {
-          const c = line.createCell();
-          c.content = 1 << Content.WIDTH_SHIFT | 'E'.charCodeAt(0);
-          c.fg = this._curAttrData.fg;
-          c.bg = this._curAttrData.bg;
-          return c;
-        })();
-        line.fill(cell);
-        line.isWrapped = false;
-      }
+      if (!line) continue;
+
+      cell ??= line.createAsciiCell('E', this._curAttrData);
+      line.fill(cell);
+      line.isWrapped = false;
     }
     this._dirtyRowTracker.markAllDirty();
     this._setCursor(0, 0);

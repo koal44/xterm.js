@@ -5,7 +5,7 @@
 
 import { IDisposable } from '@xterm/xterm';
 import { ImageRenderer } from './ImageRenderer';
-import { ITerminalExt, IExtendedAttrsImage, IImageAddonOptions, IImageSpec, IBufferLineExt, BgFlags, Cell, Content, ICellSize, ExtFlags, Attributes, UnderlineStyle } from './Types';
+import { ITerminalExt, IExtendedAttrsImage, IImageAddonOptions, IImageSpec, IBufferLineExt, BgFlags, Cell, ICellSize, ExtFlags, Attributes, UnderlineStyle } from './Types';
 
 
 // fallback default cell size
@@ -459,7 +459,7 @@ export class ImageStorage implements IDisposable {
         // expand only if right side is empty (nothing got wrapped from below)
         let hasData = false;
         for (let rightCol = oldCol + 1; rightCol > metrics.cols; ++rightCol) {
-          if (line._data[rightCol * Cell.SIZE + Cell.CONTENT] & Content.HAS_CONTENT_MASK) {
+          if (line.hasContent(rightCol)) {
             hasData = true;
             break;
           }

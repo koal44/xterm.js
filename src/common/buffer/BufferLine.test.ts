@@ -2,7 +2,7 @@
  * Copyright (c) 2018 The xterm.js authors. All rights reserved.
  * @license MIT
  */
-import { NULL_CELL_CHAR, NULL_CELL_WIDTH, NULL_CELL_CODE, DEFAULT_ATTR, Content, UnderlineStyle, BgFlags, Attributes, FgFlags } from 'common/buffer/Constants';
+import { NULL_CELL_CHAR, NULL_CELL_WIDTH, NULL_CELL_CODE, DEFAULT_ATTR, UnderlineStyle, BgFlags, Attributes, FgFlags } from 'common/buffer/Constants';
 import { BufferLine } from 'common/buffer//BufferLine';
 import { CellData } from 'common/buffer/CellData';
 import { IBufferLine } from '../Types';
@@ -151,23 +151,23 @@ describe('CellData', () => {
     // ASCII
     cell = CellData.fromCharData([123, 'a', 1]);
     assert.deepEqual(snapCell(cell as CellData), [123, 'a', 1, 'a'.charCodeAt(0)]);
-    assert.equal(cell.isCombined(), 0);
+    assert.equal(cell.isCombined(), false);
     // combining
     cell = CellData.fromCharData([123, 'e\u0301', 1]);
     assert.deepEqual(snapCell(cell as CellData), [123, 'e\u0301', 1, '\u0301'.charCodeAt(0)]);
-    assert.equal(cell.isCombined(), Content.IS_COMBINED_MASK);
+    assert.equal(cell.isCombined(), true);
     // surrogate
     cell = CellData.fromCharData([123, '𝄞', 1]);
     assert.deepEqual(snapCell(cell as CellData), [123, '𝄞', 1, 0x1D11E]);
-    assert.equal(cell.isCombined(), 0);
+    assert.equal(cell.isCombined(), false);
     // surrogate + combining
     cell = CellData.fromCharData([123, '𓂀\u0301', 1]);
     assert.deepEqual(snapCell(cell as CellData), [123, '𓂀\u0301', 1, '𓂀\u0301'.charCodeAt(2)]);
-    assert.equal(cell.isCombined(), Content.IS_COMBINED_MASK);
+    assert.equal(cell.isCombined(), true);
     // wide char
     cell = CellData.fromCharData([123, '１', 2]);
     assert.deepEqual(snapCell(cell as CellData), [123, '１', 2, '１'.charCodeAt(0)]);
-    assert.equal(cell.isCombined(), 0);
+    assert.equal(cell.isCombined(), false);
   });
 });
 
@@ -491,7 +491,7 @@ describe('BufferLine', function(): void {
       // width is set to 1
       assert.deepEqual(snapCell(cell as CellData), [DEFAULT_ATTR, '\u0301', 1, 0x0301]);
       // do not account a single combining char as combined
-      assert.equal(cell.isCombined(), 0);
+      assert.equal(cell.isCombined(), false);
     });
     it('should add char to combining string in cell', () => {
       const line = new TestBufferLine(3, CellData.fromCharData([DEFAULT_ATTR, NULL_CELL_CHAR, NULL_CELL_WIDTH, NULL_CELL_CODE]), false);
@@ -503,7 +503,7 @@ describe('BufferLine', function(): void {
       // width is set to 1
       assert.deepEqual(snapCell(cell as CellData), [123, 'e\u0301\u0301', 1, 0x0301]);
       // do not account a single combining char as combined
-      assert.equal(cell.isCombined(), Content.IS_COMBINED_MASK);
+      assert.equal(cell.isCombined(), true);
     });
     it('should create combining string on taken cell', () => {
       const line = new TestBufferLine(3, CellData.fromCharData([DEFAULT_ATTR, NULL_CELL_CHAR, NULL_CELL_WIDTH, NULL_CELL_CODE]), false);
@@ -515,7 +515,7 @@ describe('BufferLine', function(): void {
       // width is set to 1
       assert.deepEqual(snapCell(cell as CellData), [123, 'e\u0301', 1, 0x0301]);
       // do not account a single combining char as combined
-      assert.equal(cell.isCombined(), Content.IS_COMBINED_MASK);
+      assert.equal(cell.isCombined(), true);
     });
   });
   describe('correct fullwidth handling', () => {

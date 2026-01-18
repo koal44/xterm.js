@@ -209,7 +209,7 @@ export interface IAttributeData {
 export interface ICellData extends IAttributeData {
   content: number;
   combinedData: string;
-  isCombined(): number;
+  isCombined(): boolean;
   getWidth(): number;
   getChars(): string;
   getCode(): number;
@@ -237,18 +237,19 @@ export interface IBufferLine {
   getTrimmedLength(): number;
   getNoBgTrimmedLength(): number;
   translateToString(trimRight?: boolean, startCol?: number, endCol?: number, outColumns?: number[]): string;
-  createCell(): ICellData;
+  createCell(attr?: IAttributeData): ICellData;
   createNullCell(attr?: IAttributeData): ICellData;
   createWhitespaceCell(attr?: IAttributeData): ICellData;
+  createAsciiCell(char: string, attr?: IAttributeData): ICellData;
 
   /* direct access to cell attrs */
   getWidth(index: number): number;
-  hasWidth(index: number): number;
+  hasWidth(index: number): boolean;
   getFg(index: number): number;
   getBg(index: number): number;
-  hasContent(index: number): number;
+  hasContent(index: number): boolean;
   getCodePoint(index: number): number;
-  isCombined(index: number): number;
+  isCombined(index: number): boolean;
   getString(index: number): string;
 }
 

@@ -12,7 +12,7 @@ import { IRenderDimensions, IRenderer, IRequestRedrawEvent } from 'browser/rende
 import { ICharSizeService, ICharacterJoinerService, ICoreBrowserService, IThemeService } from 'browser/services/Services';
 import { IBufferLine, ICellData } from 'common/Types';
 import { AttributeData } from 'common/buffer/AttributeData';
-import { Attributes, Content, NULL_CELL_CHAR, NULL_CELL_CODE } from 'common/buffer/Constants';
+import { Attributes, NULL_CELL_CHAR, NULL_CELL_CODE } from 'common/buffer/Constants';
 import { ICoreService, IDecorationService, IOptionsService } from 'common/services/Services';
 import { Terminal } from '@xterm/xterm';
 import { GlyphRenderer } from './GlyphRenderer';
@@ -656,9 +656,9 @@ export class JoinedCellData extends AttributeData implements ICellData {
     this._width = width;
   }
 
-  public isCombined(): number {
+  public isCombined(): boolean {
     // always mark joined cell data as combined
-    return Content.IS_COMBINED_MASK;
+    return true;
   }
 
   public getWidth(): number {

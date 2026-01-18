@@ -6,7 +6,7 @@
 import { IBufferLine, ICellData } from 'common/Types';
 import { ICharacterJoiner } from 'browser/Types';
 import { AttributeData } from 'common/buffer/AttributeData';
-import { WHITESPACE_CELL_CHAR, Content } from 'common/buffer/Constants';
+import { WHITESPACE_CELL_CHAR } from 'common/buffer/Constants';
 import { IBufferService } from 'common/services/Services';
 import { ICharacterJoinerService } from 'browser/services/Services';
 
@@ -27,9 +27,9 @@ export class JoinedCellData extends AttributeData implements ICellData {
     this._width = width;
   }
 
-  public isCombined(): number {
+  public isCombined(): boolean {
     // always mark joined cell data as combined
-    return Content.IS_COMBINED_MASK;
+    return true;
   }
 
   public getWidth(): number {
