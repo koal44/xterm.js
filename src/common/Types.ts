@@ -251,6 +251,12 @@ export interface IBufferLine {
   getCodePoint(index: number): number;
   isCombined(index: number): boolean;
   getString(index: number): string;
+
+  snapRightVisualIndex(col: number): number;
+  isNullCell(col: number): boolean;
+  isTailCell(col: number): boolean;
+  isEmptyCell(col: number): boolean;
+  countTrailingNullCells(): number;
 }
 
 export interface IMarker extends IDisposable {

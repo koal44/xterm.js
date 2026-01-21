@@ -73,13 +73,18 @@ export class BufferLine implements IBufferLine {
    * primitive getters
    * use these when only one value is needed, otherwise use `loadCell`
    */
+
+  private _getContent(index: number): number {
+    return this._data[index * CELL_SIZE + Cell.CONTENT];
+  }
+
   public getWidth(index: number): number {
-    return CellData.width(this._data[index * CELL_SIZE + Cell.CONTENT]);
+    return CellData.width(this._getContent(index));
   }
 
   /** Test whether content has width. */
   public hasWidth(index: number): boolean {
-    return !!CellData.width(this._data[index * CELL_SIZE + Cell.CONTENT]);
+    return !!CellData.width(this._getContent(index));
   }
 
   /** Get FG cell component. */
@@ -92,13 +97,23 @@ export class BufferLine implements IBufferLine {
     return this._data[index * CELL_SIZE + Cell.BG];
   }
 
+  /** Get state of protected flag. */
+  public isProtected(index: number): number {
+    return this.getBg(index) & BgFlags.PROTECTED;
+  }
+
   /**
    * Test whether contains any chars.
    * Basically an empty has no content, but other cells might differ in FG/BG
    * from real empty cells.
    */
   public hasContent(index: number): boolean {
-    return CellData.hasContent(this._data[index * CELL_SIZE + Cell.CONTENT]);
+    return CellData.hasContent(this._getContent(index));
+  }
+
+  /** Test whether the cell contains a combined string. */
+  public isCombined(index: number): boolean {
+    return CellData.isCombined(this._getContent(index));
   }
 
   /**
@@ -107,31 +122,21 @@ export class BufferLine implements IBufferLine {
    * a single UTF32 codepoint or the last codepoint of a combined string.
    */
   public getCodePoint(index: number): number {
-    const content = this._data[index * CELL_SIZE + Cell.CONTENT];
+    const content = this._getContent(index);
     if (CellData.isCombined(content)) {
       return this._combined[index].charCodeAt(this._combined[index].length - 1);
     }
     return CellData.codepoint(content);
   }
 
-  /** Test whether the cell contains a combined string. */
-  public isCombined(index: number): boolean {
-    return !!(CellData.isCombined(this._data[index * CELL_SIZE + Cell.CONTENT]));
-  }
-
   /** Returns the string content of the cell. */
   public getString(index: number): string {
-    const content = this._data[index * CELL_SIZE + Cell.CONTENT];
+    const content = this._getContent(index);
     if (CellData.isCombined(content)) {
       return this._combined[index];
     }
     const cp = CellData.codepoint(content);
     return cp ? stringFromCodePoint(cp) : '';
-  }
-
-  /** Get state of protected flag. */
-  public isProtected(index: number): number {
-    return this._data[index * CELL_SIZE + Cell.BG] & BgFlags.PROTECTED;
   }
 
   /**
@@ -161,6 +166,8 @@ export class BufferLine implements IBufferLine {
     }
     if (cell.bg & BgFlags.HAS_EXTENDED) {
       this._extendedAttrs[index] = cell.extended;
+    } else if (this._extendedAttrs[index]) {
+      delete this._extendedAttrs[index];
     }
     this._data[index * CELL_SIZE + Cell.CONTENT] = cell.content;
     this._data[index * CELL_SIZE + Cell.FG] = cell.fg;
@@ -175,6 +182,8 @@ export class BufferLine implements IBufferLine {
   public setCellFromCodepoint(index: number, codePoint: number, width: number, attrs: IAttributeData): void {
     if (attrs.bg & BgFlags.HAS_EXTENDED) {
       this._extendedAttrs[index] = attrs.extended;
+    } else if (this._extendedAttrs[index]) {
+      delete this._extendedAttrs[index];
     }
     this._data[index * CELL_SIZE + Cell.CONTENT] = CellData.packContent(codePoint, false, width);
     this._data[index * CELL_SIZE + Cell.FG] = attrs.fg;
@@ -189,12 +198,12 @@ export class BufferLine implements IBufferLine {
    */
   public addCodepointToCell(index: number, codePoint: number, width: number): void {
     const i = index * CELL_SIZE + Cell.CONTENT;
-    const content = this._data[i];
-    if (!CellData.hasContent(content)) {
-      // should not happen - we actually have no data in the cell yet
+    // should not happen - we actually have no data in the cell yet
+    if (this.isEmptyCell(index)) {
       this._data[i] = CellData.packContent(codePoint, false, 1);
       return;
     }
+    const content = this._data[i];
     this._combined[index] = CellData.isCombined(content)
       ? this._combined[index] + stringFromCodePoint(codePoint)
       : stringFromCodePoint(CellData.codepoint(content)) + stringFromCodePoint(codePoint);
@@ -252,7 +261,7 @@ export class BufferLine implements IBufferLine {
     if (pos && this.getWidth(pos - 1) === 2) {
       this.setCellFromCodepoint(pos - 1, 0, 1, fillCellData);
     }
-    if (this.getWidth(pos) === 0 && !this.hasContent(pos)) {
+    if (this.isTailCell(pos)) {
       this.setCellFromCodepoint(pos, 0, 1, fillCellData);
     }
   }
@@ -409,8 +418,8 @@ export class BufferLine implements IBufferLine {
 
   public getTrimmedLength(): number {
     for (let i = this.length - 1; i >= 0; --i) {
-      if (CellData.hasContent(this._data[i * CELL_SIZE + Cell.CONTENT])) {
-        return i + CellData.width(this._data[i * CELL_SIZE + Cell.CONTENT]);
+      if (this.hasContent(i)) {
+        return i + this.getWidth(i);
       }
     }
     return 0;
@@ -418,8 +427,8 @@ export class BufferLine implements IBufferLine {
 
   public getNoBgTrimmedLength(): number {
     for (let i = this.length - 1; i >= 0; --i) {
-      if (CellData.hasContent(this._data[i * CELL_SIZE + Cell.CONTENT]) || (this._data[i * CELL_SIZE + Cell.BG] & Attributes.CM_MASK)) {
-        return i + CellData.width(this._data[i * CELL_SIZE + Cell.CONTENT]);
+      if (this.hasContent(i) || (this.getBg(i) & Attributes.CM_MASK)) {
+        return i + this.getWidth(i);
       }
     }
     return 0;
@@ -523,6 +532,26 @@ export class BufferLine implements IBufferLine {
     const cell = this.createCell(attr);
     cell.setChars(char, 1);
     return cell;
+  }
+
+  public snapRightVisualIndex(col: number): number {
+    if (col >= this.length) return this.length;
+    return this.hasWidth(col) ? col : col + 1;
+  }
+
+  public snapLeftVisualIndex(col: number): number {
+    if (col >= this.length) return this.length;
+    return this.hasWidth(col) ? col : col - 1;
+  }
+
+  public isEmptyCell(col: number): boolean { return !this.hasContent(col); }
+  public isNullCell(col: number):  boolean { return this.isEmptyCell(col) && this.hasWidth(col); } // width==1
+  public isTailCell(col: number):  boolean { return this.isEmptyCell(col) && !this.hasWidth(col); } // width==0
+
+  public countTrailingNullCells(): number {
+    let n = 0;
+    for (let i = this.length - 1; i >= 0 && this.isNullCell(i); --i) ++n;
+    return n;
   }
 
 }

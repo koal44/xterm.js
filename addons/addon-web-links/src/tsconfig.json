@@ -15,6 +15,9 @@
       "../../../node_modules/@types/mocha"
     ],
     "paths": {
+      "common/*": [
+        "../../../src/common/*"
+      ],
       "@xterm/addon-web-links": [
         "../typings/addon-web-links.d.ts"
       ]
@@ -23,5 +26,10 @@
   "include": [
     "./**/*",
     "../../../typings/xterm.d.ts"
+  ],
+  "references": [
+    {
+      "path": "../../../src/common"
+    }
   ]
 }

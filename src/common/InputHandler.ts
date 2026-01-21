@@ -823,7 +823,7 @@ export class InputHandler extends Disposable implements IInputHandler {
         // - hasContent(false) + hasWidth(1): empty cell due to early wrapping wide char, go one
         //   cell further back
         const line = this._activeBuffer.lines.get(this._activeBuffer.ybase + this._activeBuffer.y)!;
-        if (line.hasWidth(this._activeBuffer.x) && !line.hasContent(this._activeBuffer.x)) {
+        if (line.isNullCell(this._activeBuffer.x)) {
           this._activeBuffer.x--;
           // We do this only once, since width=1 + hasContent=false currently happens only once
           // before early wrapping of a wide char.

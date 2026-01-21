@@ -4,6 +4,7 @@
  */
 
 import { ILinkProvider, ILink, Terminal, IViewportRange, IBufferLine } from '@xterm/xterm';
+import { IBufferLine as IBufferLineInternal } from 'common/Types';
 
 export interface ILinkProviderOptions {
   hover?(event: MouseEvent, text: string, location: IViewportRange): void;
@@ -158,32 +159,25 @@ export class LinkComputer {
    */
   private static _mapStrIdx(terminal: Terminal, lineIndex: number, rowIndex: number, stringIndex: number): [number, number] {
     const buf = terminal.buffer.active;
-    const cell = buf.getNullCell();
     let start = rowIndex;
     while (stringIndex) {
-      const line = buf.getLine(lineIndex);
+      const line = (buf.getLine(lineIndex) as any)?._line as IBufferLineInternal | undefined; // HACK
       if (!line) {
         return [-1, -1];
       }
       for (let i = start; i < line.length; ++i) {
-        line.getCell(i, cell);
-        const chars = cell.getChars();
-        const width = cell.getWidth();
-        if (width) {
-          stringIndex -= chars.length || 1;
+        if (line.hasWidth(i)) {
+          stringIndex -= line.isNullCell(i) ? 1 : line.getString(i).length;
 
           // correct stringIndex for early wrapped wide chars:
           // - currently only happens at last cell
           // - cells to the right are reset with chars='' and width=1 in InputHandler.print
           // - follow-up line must be wrapped and contain wide char at first cell
           // --> if all these conditions are met, correct stringIndex by +1
-          if (i === line.length - 1 && chars === '') {
-            const line = buf.getLine(lineIndex + 1);
-            if (line && line.isWrapped) {
-              line.getCell(0, cell);
-              if (cell.getWidth() === 2) {
-                stringIndex += 1;
-              }
+          if (i === line.length - 1) {
+            const nextLine = buf.getLine(lineIndex + 1);
+            if (nextLine?.isWrapped) {
+              stringIndex += line.countTrailingNullCells();
             }
           }
         }

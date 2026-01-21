@@ -6,6 +6,7 @@
 import type { Terminal } from '@xterm/xterm';
 import type { ISearchOptions } from '@xterm/addon-search';
 import type { SearchLineCache } from './SearchLineCache';
+import { IBufferLine as IBufferLineInternal } from 'common/Types';
 
 /**
  * Represents the position to start a search from.
@@ -343,24 +344,20 @@ export class SearchEngine {
   }
 
   private _stringLengthToBufferSize(row: number, offset: number): number {
-    const line = this._terminal.buffer.active.getLine(row);
+    const line = (this._terminal.buffer.active.getLine(row) as any)?._line as IBufferLineInternal | undefined; // HACK
     if (!line) {
       return 0;
     }
     for (let i = 0; i < offset; i++) {
-      const cell = line.getCell(i);
-      if (!cell) {
-        break;
-      }
+      if (i >= line.length) break;
       // Adjust the searchIndex to normalize emoji into single chars
-      const char = cell.getChars();
+      const char = line.getString(i);
       if (char.length > 1) {
         offset -= char.length - 1;
       }
       // Adjust the searchIndex for empty characters following wide unicode
       // chars (eg. CJK)
-      const nextCell = line.getCell(i + 1);
-      if (nextCell && nextCell.getWidth() === 0) {
+      if (line.isTailCell(i + 1)) {
         offset++;
       }
     }
@@ -370,20 +367,16 @@ export class SearchEngine {
   private _bufferColsToStringOffset(startRow: number, cols: number): number {
     let lineIndex = startRow;
     let offset = 0;
-    let line = this._terminal.buffer.active.getLine(lineIndex);
+    let line = (this._terminal.buffer.active.getLine(lineIndex) as any)?._line as IBufferLineInternal | undefined; // HACK
     while (cols > 0 && line) {
       for (let i = 0; i < cols && i < this._terminal.cols; i++) {
-        const cell = line.getCell(i);
-        if (!cell) {
-          break;
-        }
-        if (cell.getWidth()) {
+        if (line.hasWidth(i)) {
           // Treat null characters as whitespace to align with the translateToString API
-          offset += cell.getCode() === 0 ? 1 : cell.getChars().length;
+          offset += line.isNullCell(i) ? 1 : line.getString(i).length;
         }
       }
       lineIndex++;
-      line = this._terminal.buffer.active.getLine(lineIndex);
+      line = (this._terminal.buffer.active.getLine(lineIndex) as any)?._line as IBufferLineInternal | undefined; // HACK
       if (line && !line.isWrapped) {
         break;
       }
