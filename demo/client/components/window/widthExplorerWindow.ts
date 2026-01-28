@@ -95,7 +95,7 @@ interface IAppProfile {
   measureDelWidth: MeasureWidthFn;
 }
 
-export const SHELL_PROFILES: IAppProfile[] = [
+export const APP_PROFILES: IAppProfile[] = [
   {
     id: 'bash',
     label: 'bash (GNU Readline)',
@@ -233,9 +233,9 @@ interface IMsgReaderTimeoutPolicy {
   shouldThrowOnTimeout: () => boolean;
 }
 
-export class ShellExplorerWindow extends BaseWindow {
-  public readonly id = 'shell-explorer';
-  public readonly label = 'Shell';
+export class WidthExplorerWindow extends BaseWindow {
+  public readonly id = 'width-explorer';
+  public readonly label = 'Width';
 
   private _sock: WebSocket | undefined;
   private _rep: ISocketReporter | undefined;
@@ -278,7 +278,7 @@ export class ShellExplorerWindow extends BaseWindow {
 
     // Shell profile
     addRow(root, 'profile: ',
-      mkSelect(SHELL_PROFILES, null as AppId | null, id => this._setProfile(id), 'Shell profile (key sequences)'),
+      mkSelect(APP_PROFILES, null as AppId | null, id => this._setProfile(id), 'Shell profile (key sequences)'),
     );
 
     // Log options
@@ -388,7 +388,7 @@ export class ShellExplorerWindow extends BaseWindow {
   // State / actions
   private async _setProfile(id: AppId): Promise<void> {
     const oldId = this._profile?.id;
-    this._profile = SHELL_PROFILES.find(p => p.id === id)!;
+    this._profile = APP_PROFILES.find(p => p.id === id)!;
     if (oldId === this._profile.id) return;
     await this._initProfile();
     this._appendLog(`[dev] shell profile = ${this._profile.id}\n`);
