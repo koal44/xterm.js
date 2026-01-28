@@ -24,8 +24,11 @@ import { BaseWindow } from './baseWindow';
 import type { Terminal } from '@xterm/xterm';
 import type { AddonCollection } from 'types';
 
+// choose ascii single char to avoid app splitting suffix across messages
 const TEST_PREFIX = '«';
 const TEST_SUFFIX = '»';
+// const TEST_PREFIX = 'ABC';
+// const TEST_SUFFIX = 'CBA';
 const TESTS = [
   '🙂',
   '👨‍🌾',
@@ -39,11 +42,11 @@ const TURBO_COLS = 600; // widen columns for turbo mode
 
 const RE_CUB = /\x1b\[(\d*)D/;                  // CUB: cursor back n
 const RE_CUF = /\x1b\[(\d*)C/;                  // CUF: cursor forward n
-const RE_CUF_NOT_ONE = /\x1b\[(?!1C)(\d+)C/;    // CUF: cursor forward more than 1
-const RE_CR_CUF_ONLY = /^\r(?:\x1b\[(\d*)C)+$/; // CR + CUF only
 const RE_TAIL_CR_CUF = /\r(?:\x1b\[(\d*)C)+$/;  // tail CR + CUF only
 const RE_CUP = /\x1b\[(\d+);(\d+)H/;            // CUP: cursor position r;c
 const RE_BS_ONLY = /^\x08+$/;                   // BS: only backspaces
+const RE_TRAILING_BS = /\x08+$/;                // backspaces at end of msg
+const RE_CUV = /\x1b\[(\d*)[AB]/;               // any vertical movement (CUU/CUD)
 
 interface IKeymap { left: string, right: string, home: string, end: string, clear: string, del: string }
 const DEFAULT_KEYMAP: IKeymap = {
@@ -84,6 +87,7 @@ interface IAppProfile {
   id: AppId;
   label: string;
   keys: IKeymap;
+  clearNeedsEnd: boolean; // whether clear key needs an END before it to work properly
   init: string[]; // commands to run when switching into this profile
   widthBuckets: IWidthBucket[];
   measureColWidth: MeasureWidthFn;
@@ -91,11 +95,12 @@ interface IAppProfile {
   measureDelWidth: MeasureWidthFn;
 }
 
-const SHELL_PROFILES: IAppProfile[] = [
+export const SHELL_PROFILES: IAppProfile[] = [
   {
     id: 'bash',
     label: 'bash (GNU Readline)',
     keys: { ...DEFAULT_KEYMAP },
+    clearNeedsEnd: true,
     init: [
       `exec bash --noprofile --norc`,
       `export PS1="> "`,
@@ -111,69 +116,20 @@ const SHELL_PROFILES: IAppProfile[] = [
     ],
     widthBuckets: DEFAULT_WIDTH_BUCKETS,
     async measureColWidth(socket, readUntil, payload, prefix, suffix) {
-      let ack: string | undefined;
-
-      socket.send(this.keys.clear);
-      await readUntil(() => true, 80, false);
-
-      socket.send(prefix + payload + suffix);
-      ack = await readUntil(m => m.includes(suffix), 1000);
-      if (!ack) return NaN;
-
-      socket.send(this.keys.home);
-      ack = await readUntil(m => RE_CUF.test(m) || RE_BS_ONLY.test(m), 1100);
-      if (!ack) return NaN;
-
-      socket.send(this.keys.end);
-      ack = await readUntil(m => RE_CUF.test(m), 1200);
-      if (!ack) return NaN;
-
-      const n = parseWidthFromCUFMsg(ack);
-      if (!Number.isFinite(n)) return NaN;
-
-      return n - (prefix.length + suffix.length);
+      return await measureColWidth(socket, readUntil, payload, prefix, suffix, this.keys, this.clearNeedsEnd);
     },
     async measureMovWidth(socket, readUntil, payload, prefix, suffix) {
-      socket.send(this.keys.clear);
-      await readUntil(() => true, 120, false);
-
-      socket.send(payload + suffix);
-      let ack = await readUntil(m => m.includes(suffix), 1000);
-      if (!ack) return NaN;
-
-      let rightRepeat = 0;
-      const MAX_RIGHT = 15;
-
-      while (rightRepeat <= MAX_RIGHT) {
-        socket.send(this.keys.home);
-        ack = await readUntil(m => RE_CUF.test(m) || RE_BS_ONLY.test(m), 900);
-        if (!ack) return NaN;
-
-        for (let i = 0; i < rightRepeat; i++) {
-          socket.send(this.keys.right);
-          ack = await readUntil(m => RE_CUF.test(m), 800);
-          if (!ack) return NaN;
-        }
-
-        socket.send(this.keys.end);
-        ack = await readUntil(m => RE_CUF.test(m), 700);
-        if (!ack) return NaN;
-
-        const n = parseWidthFromCUFMsg(ack);
-        if (!Number.isFinite(n) || n < suffix.length) return NaN;
-        if (n === suffix.length) return rightRepeat;
-
-        rightRepeat++;
-      }
-
-      return NaN;
+      return await measureMovWidth(socket, readUntil, payload, prefix, suffix, this.keys, this.clearNeedsEnd);
     },
-    async measureDelWidth(socket, readUntil, payload, prefix, suffix) { return NaN; },
+    async measureDelWidth(socket, readUntil, payload, prefix, suffix) {
+      return await measureDelWidth(socket, readUntil, payload, prefix, suffix, this.keys, this.clearNeedsEnd);
+    },
   },
   {
     id: 'zsh',
     label: 'zsh (Zsh Line Editor / ZLE)',
     keys: { ...DEFAULT_KEYMAP },
+    clearNeedsEnd: false,
     init: [
       `exec zsh -f`,
       `precmd_functions=(); preexec_functions=(); chpwd_functions=(); PROMPT='> '; RPROMPT=''; PS1='> '`,
@@ -191,83 +147,26 @@ const SHELL_PROFILES: IAppProfile[] = [
       `bindkey '^?'   backward-delete-char`, // \x7f
     ],
     widthBuckets: [
+      // zsh/ZLE private byte stash in 0xe000..0xe0ff for lossless round-tripping (ISO 10646)
+      { label: 'width_private_stash', annotateMovWidth: false, annotateDelWidth: false, match: w => w === 4 },
       { label: 'width_unprintable', annotateMovWidth: false, annotateDelWidth: false, match: w => w === 6 || w === 10 },
       ...DEFAULT_WIDTH_BUCKETS,
     ],
     async measureColWidth(socket, readUntil, payload, prefix, suffix) {
-      let ack: string | undefined;
-
-      socket.send(this.keys.clear);
-      await readUntil(() => true, 80, false);
-
-      socket.send(prefix + payload + suffix);
-      ack = await readUntil(m => m.includes(suffix), 1000);
-      if (!ack) return NaN;
-
-      socket.send(this.keys.home);
-      ack = await readUntil(m => RE_CUB.test(m) || m.includes('\x08'), 900); // || RE_BS_ONLY.test(m), 900);
-      if (!ack) return NaN;
-
-      // const n = RE_CUB.test(ack) ? parseWidthFromCUBMsg(ack) : parseWidthFromBSMsg(ack);
-      // if (!Number.isFinite(n)) return NaN;
-
-      // return n - (prefix.length + suffix.length);
-
-      socket.send(this.keys.end);
-      ack = await readUntil(m => RE_CUF.test(m), 800);
-
-      const n = parseWidthFromCUFMsg(ack);
-      if (!Number.isFinite(n)) return NaN;
-
-      return n - (prefix.length + suffix.length);
+      return await measureColWidth(socket, readUntil, payload, prefix, suffix, this.keys, this.clearNeedsEnd);
     },
     async measureMovWidth(socket, readUntil, payload, prefix, suffix) {
-      socket.send(this.keys.clear);
-      await readUntil(() => true, 120, false);
-
-      socket.send(prefix + payload + suffix);
-      let ack = await readUntil(m => m.includes(suffix), 1000);
-      if (!ack) return NaN;
-
-      /* ZLE key width is context-sensitive. a prefix anchors the line so
-       * zw controls collapse instead of behaving like cursor units. */
-      let rightRepeat = 1; // use prefix and start at 1
-      const MAX_RIGHT = 15;
-
-      while (rightRepeat <= MAX_RIGHT) {
-        socket.send(this.keys.home);
-        ack = await readUntil(m => RE_CUB.test(m) || m.includes('\x08'), 900);
-        if (!ack) return NaN;
-
-        for (let i = 0; i < rightRepeat; i++) {
-          socket.send(this.keys.right);
-          ack = await readUntil(m => RE_CUF.test(m), 800);
-          if (!ack) return NaN;
-        }
-
-        socket.send(this.keys.end);
-        ack = await readUntil(m => RE_CUF.test(m), 800);
-        if (!ack) return NaN;
-
-        const n = parseWidthFromCUFMsg(ack);
-        if (!Number.isFinite(n) || n < suffix.length) return NaN;
-
-        if (n === suffix.length) {
-          // subtract prefix traversal
-          return rightRepeat - 1;
-        }
-
-        rightRepeat++;
-      }
-
-      return NaN;
+      return await measureMovWidth(socket, readUntil, payload, prefix, suffix, this.keys, this.clearNeedsEnd);
     },
-    async measureDelWidth(socket, readUntil, payload, prefix, suffix) { return NaN; },
+    async measureDelWidth(socket, readUntil, payload, prefix, suffix) {
+      return await measureDelWidth(socket, readUntil, payload, prefix, suffix, this.keys, this.clearNeedsEnd);
+    },
   },
   {
     id: 'fish',
     label: 'fish (Command line editor)',
     keys: { ...DEFAULT_KEYMAP },
+    clearNeedsEnd: true,
     init: [
       `exec fish --no-config --private`,
       `function fish_prompt; echo -n "> "; end`,
@@ -287,160 +186,13 @@ const SHELL_PROFILES: IAppProfile[] = [
     ],
     widthBuckets: DEFAULT_WIDTH_BUCKETS,
     async measureColWidth(socket, readUntil, payload, prefix, suffix) {
-      let ack: string | undefined;
-
-      // fish is bugged? need to go to end before clearing
-      // (it's acting like backward-kill-line rather than kill-line)
-      socket.send(this.keys.end);
-      await readUntil(() => true, 80, false);
-
-      socket.send(this.keys.clear);
-      await readUntil(() => true, 80, false);
-
-      socket.send(prefix + payload + suffix);
-      ack = await readUntil(m => m.includes(suffix), 1000);
-      if (!ack) return NaN;
-
-      socket.send(this.keys.home);
-      ack = await readUntil(() => true, 600);
-      if (!ack) return NaN;
-
-      let promptCols: number | undefined;
-      if (RE_CR_CUF_ONLY.test(ack)) {
-        promptCols = parseWidthFromCUFMsg(ack);
-        if (!Number.isFinite(promptCols)) return NaN;
-      }
-
-      socket.send(this.keys.end);
-      ack = await readUntil(m => RE_CUF.test(m), 800);
-      if (!ack) return NaN;
-
-      const n = parseWidthFromCUFMsg(ack);
-      if (!Number.isFinite(n)) return NaN;
-
-      if (RE_CR_CUF_ONLY.test(ack)) {
-        if (promptCols === undefined) return NaN;
-        return n - (prefix.length + suffix.length + promptCols);
-      }
-
-      return n - (prefix.length + suffix.length);
+      return await measureColWidth(socket, readUntil, payload, prefix, suffix, this.keys, this.clearNeedsEnd);
     },
     async measureMovWidth(socket, readUntil, payload, prefix, suffix) {
-      // fish is bugged? need to go to end before clearing
-      // (it's acting like backward-kill-line rather than kill-line)
-      socket.send(this.keys.end);
-      await readUntil(() => true, 80, false);
-
-      socket.send(this.keys.clear);
-      await readUntil(() => true, 80, false);
-
-      socket.send(prefix + payload + suffix);
-      let ack = await readUntil(m => m.includes(suffix), 1000);
-      if (!ack) return NaN;
-
-      socket.send(this.keys.home);
-      ack = await readUntil(m => RE_TAIL_CR_CUF.test(m), 900);
-      if (!ack) return NaN;
-
-      socket.send(this.keys.end);
-      ack = await readUntil(m => RE_TAIL_CR_CUF.test(m), 800);
-      if (!ack) return NaN;
-
-      const totalCols = parseWidthFromCUFMsg(ack);
-      const doneCol = totalCols - suffix.length;
-      if (!Number.isFinite(totalCols)) return NaN;
-
-      // go back to home
-      socket.send(this.keys.home);
-      ack = await readUntil(m => RE_TAIL_CR_CUF.test(m), 900);
-      if (!ack) return NaN;
-
-      // move past the prefix
-      for (let i = 0; i < prefix.length; i++) {
-        socket.send(this.keys.right);
-        ack = await readUntil(m => RE_TAIL_CR_CUF.test(m), 800);
-        if (!ack) return NaN;
-      }
-
-      let rightRepeat = prefix.length; // use prefix and start at 1
-      const MAX_RIGHT = 15;
-
-      while (rightRepeat <= MAX_RIGHT) {
-        socket.send(this.keys.right);
-        ack = await readUntil(m => RE_TAIL_CR_CUF.test(m), 800);
-        if (!ack) return NaN;
-
-        const currCol = parseWidthFromCUFMsg(ack);
-        if (!Number.isFinite(currCol)) return NaN;
-        if (currCol > doneCol) return NaN;
-        if (currCol === doneCol) return rightRepeat;
-        rightRepeat++;
-      }
-
-      return NaN;
+      return await measureMovWidth(socket, readUntil, payload, prefix, suffix, this.keys, this.clearNeedsEnd);
     },
     async measureDelWidth(socket, readUntil, payload, prefix, suffix) {
-      socket.send(this.keys.end);
-      await readUntil(() => true, 80, false);
-
-      socket.send(this.keys.clear);
-      await readUntil(() => true, 80, false);
-
-      socket.send(prefix + payload + suffix);
-      let ack = await readUntil(m => m.includes(suffix), 1000);
-      if (!ack) return NaN;
-
-      socket.send(this.keys.home);
-      ack = await readUntil(m => RE_TAIL_CR_CUF.test(m), 900);
-      if (!ack) return NaN;
-
-      const promptCol = parseWidthFromCUFMsg(ack);
-      if (!Number.isFinite(promptCol)) return NaN;
-
-      const doneCol = promptCol + prefix.length;
-
-      socket.send(this.keys.end);
-      ack = await readUntil(m => RE_TAIL_CR_CUF.test(m), 800);
-      if (!ack) return NaN;
-
-      // Phase A: delete suffix (not counted)
-      let col = parseWidthFromCUFMsg(ack);
-      if (!Number.isFinite(col)) return NaN;
-
-      for (let i = 0; i < suffix.length; i++) {
-        socket.send(this.keys.del);
-        ack = await readUntil(m => RE_TAIL_CR_CUF.test(m), 800);
-        if (!ack) return NaN;
-
-        col = parseWidthFromCUFMsg(ack);
-        if (!Number.isFinite(col)) return NaN;
-
-        // after stripping suffix, we must still be at/after the prefix-end target
-        if (col < doneCol) return NaN;
-      }
-
-      // already at target after suffix stripping?
-      if (col === doneCol) return 0;
-
-      // Phase B: delete payload (counted)
-      let nDel = 0;
-      const MAX_DEL = 15;
-
-      while (nDel < MAX_DEL) {
-        socket.send(this.keys.del);
-        ack = await readUntil(m => RE_TAIL_CR_CUF.test(m), 800);
-        if (!ack) return NaN;
-
-        col = parseWidthFromCUFMsg(ack);
-        if (!Number.isFinite(col)) return NaN;
-
-        nDel++;
-
-        if (col === doneCol) return nDel;
-        if (col < doneCol) return NaN;
-      }
-
-      return NaN;
+      return await measureDelWidth(socket, readUntil, payload, prefix, suffix, this.keys, this.clearNeedsEnd);
     },
   },
   {
@@ -450,65 +202,25 @@ const SHELL_PROFILES: IAppProfile[] = [
       ...DEFAULT_KEYMAP,
       clear: '\x1b', // ESC, undo line edits
     },
+    clearNeedsEnd: false,
     init: [
+      // Get-PSReadLineOption shows current options
       `function prompt { "> " }`,
       `Set-PSReadLineOption -PredictionSource None`,
       `Set-PSReadLineOption -HistorySaveStyle SaveNothing`,
+      // `Set-PSReadLineOption -Colors @{Command="$([char]0x1b)[37m";}`,
+      // `Set-PSReadLineOption -Colors @{Command='white';Default='white';`, ... doesn't work
     ],
     widthBuckets: DEFAULT_WIDTH_BUCKETS,
     async measureColWidth(socket, readUntil, payload, prefix, suffix) {
-      socket.send(this.keys.clear);
-      await readUntil(m => true, 200);
-
-      socket.send(prefix + payload + suffix);
-      await readUntil(m => m.includes(suffix), 1000);
-
-      let endMsg: string | undefined;
-      for (let attempt = 0; attempt < 3; attempt++) {
-        socket.send(this.keys.home);
-        const homeMsg = await readUntil(m => RE_CUP.test(m), 900);
-        if (!homeMsg) continue;
-
-        socket.send(this.keys.end);
-        endMsg = await readUntil(m => RE_CUF.test(m) || RE_CUP.test(m), 800);
-        if (endMsg && RE_CUF.test(endMsg)) break;
-      }
-
-      return parseWidthFromCUFMsg(endMsg) - (prefix.length + suffix.length);
+      return await measureColWidth(socket, readUntil, payload, prefix, suffix, this.keys, this.clearNeedsEnd);
     },
     async measureMovWidth(socket, readUntil, payload, prefix, suffix) {
-      socket.send(this.keys.clear);
-      await readUntil(() => true, 200);
-
-      socket.send(payload + suffix);
-      await readUntil(m => m.includes(suffix), 1000);
-
-      let rightRepeat = 0;
-      const MAX_RIGHT = 15;
-      while (rightRepeat <= MAX_RIGHT) {
-        socket.send(this.keys.home);
-        let ack = await readUntil(m => RE_CUP.test(m), 900);
-        if (!ack) return NaN;
-
-        if (rightRepeat) {
-          for (let i = 0; i < rightRepeat; i++) {
-            socket.send(this.keys.right);
-            ack = await readUntil(m => RE_CUF.test(m), 800);
-            if (!ack) return NaN;
-          }
-        }
-
-        socket.send(this.keys.end);
-        ack = await readUntil(m => RE_CUF_NOT_ONE.test(m), 800);
-        if (!ack) return NaN;
-
-        const n = parseWidthFromCUFMsg(ack);
-        if (!Number.isFinite(n) || n < suffix.length) return NaN;
-        if (n === suffix.length) return rightRepeat;
-        rightRepeat++;
-      }
+      return await measureMovWidth(socket, readUntil, payload, prefix, suffix, this.keys, this.clearNeedsEnd);
     },
-    async measureDelWidth(socket, readUntil, payload, prefix, suffix) { return NaN; },
+    async measureDelWidth(socket, readUntil, payload, prefix, suffix) {
+      return await measureDelWidth(socket, readUntil, payload, prefix, suffix, this.keys, this.clearNeedsEnd);
+    },
   }
 ];
 
@@ -517,12 +229,14 @@ interface ISocketReporter {
   logEnabled: boolean;
 }
 
+interface IMsgReaderTimeoutPolicy {
+  shouldThrowOnTimeout: () => boolean;
+}
+
 export class ShellExplorerWindow extends BaseWindow {
   public readonly id = 'shell-explorer';
   public readonly label = 'Shell';
 
-  private _out: HTMLPreElement;
-  private _outMaxChars = 15000;
   private _sock: WebSocket | undefined;
   private _rep: ISocketReporter | undefined;
   private _profile: IAppProfile | undefined;
@@ -538,6 +252,17 @@ export class ShellExplorerWindow extends BaseWindow {
   private _measureColWidth = true;
   private _measureMovWidth = true;
   private _measureDelWidth = true;
+  private _throwOnTimeout = false;
+  private _msgTimeoutPolicy: IMsgReaderTimeoutPolicy = {
+    shouldThrowOnTimeout: () => this._throwOnTimeout,
+  };
+
+  private _logEl: HTMLPreElement;
+  private _logFlushMs = 100;
+  private _logMaxLines = 100;
+  private _log = new CircularList(this._logMaxLines);
+  private _logFlushScheduled = false;
+  private _logFlushTimer: number | undefined;
 
   constructor(
     terminal: Terminal,
@@ -607,6 +332,7 @@ export class ShellExplorerWindow extends BaseWindow {
       mkCheckbox('col ', 'Measure col-reported widths', this._measureColWidth, v => { this._measureColWidth = v; }).label,
       mkCheckbox('mov ', 'Measure mov-reported widths', this._measureMovWidth, v => { this._measureMovWidth = v; }).label,
       mkCheckbox('del ', 'Measure del-reported widths', this._measureDelWidth, v => { this._measureDelWidth = v; }).label,
+      mkCheckbox('throw ', 'Throw on message timeout', this._throwOnTimeout, v => { this._throwOnTimeout = v; }).label,
     );
 
     addRow(root, '',
@@ -640,7 +366,7 @@ export class ShellExplorerWindow extends BaseWindow {
         'turbo ', 'Disable printing and widen columns for faster runs', this._genTableTurboMode,
         v => {
           this._genTableTurboMode = v;
-          if (v) this._setLogEnabled(!v);
+          // if (v) this._setLogEnabled(!v);
         },
       ).label,
     );
@@ -651,7 +377,7 @@ export class ShellExplorerWindow extends BaseWindow {
     // Output
     const pre = document.createElement('pre');
     pre.textContent = this._profile?.id ? `[dev] shell profile = ${this._profile.id}\n` : '[dev] no shell profile selected\n';
-    this._out = pre;
+    this._logEl = pre;
     root.appendChild(pre);
 
     // first, early attempt at installing the reporter (socket creation is async)
@@ -732,15 +458,36 @@ export class ShellExplorerWindow extends BaseWindow {
     this._sock.send(data);
   }
 
-  private _clearLog(): void {
-    this._out.textContent = '';
+  private _appendLog(line: string): void {
+    // invariant: callers do NOT include '\n'
+    this._log.push(line);
+
+    if (!this._logFlushScheduled) {
+      this._logFlushScheduled = true;
+      this._logFlushTimer = window.setTimeout(() => this._flushLogNow(), this._logFlushMs);
+    }
   }
 
-  private _appendLog(s: string): void {
-    if (this._out.textContent.length > this._outMaxChars) {
-      this._clearLog();
+  private _flushLogNow(): void {
+    this._logFlushScheduled = false;
+    if (this._logFlushTimer !== undefined) {
+      clearTimeout(this._logFlushTimer);
+      this._logFlushTimer = undefined;
     }
-    this._out.textContent += s;
+
+    this._logEl.textContent = this._log.toString();
+  }
+
+  private _clearLog(): void {
+    this._log.clear();
+
+    this._logFlushScheduled = false;
+    if (this._logFlushTimer !== undefined) {
+      clearTimeout(this._logFlushTimer);
+      this._logFlushTimer = undefined;
+    }
+
+    this._logEl.textContent = '';
   }
 
   private _logSock(rep: ISocketReporter, prefix: '<<< ' | '>>> ', data: unknown): void {
@@ -763,10 +510,12 @@ export class ShellExplorerWindow extends BaseWindow {
       return;
     }
 
-    const msgReader = new MessageReader(this._sock);
+    const msgReader = new MessageReader(this._sock, this._msgTimeoutPolicy);
     const bar = '----------------------------\n';
 
     try {
+      await this._clearTerminalLine(msgReader);
+
       if (this._measureColWidth) {
         const w = await this._profile.measureColWidth(
           this._sock,
@@ -788,7 +537,7 @@ export class ShellExplorerWindow extends BaseWindow {
           TEST_SUFFIX
         );
         this._appendLog(`${bar}mov-width: ${w}\n${bar}`);
-        if (this._measureMovWidth) this._measureStatusSpan.textContent += ', ';
+        if (this._measureColWidth) this._measureStatusSpan.textContent += ', ';
         this._measureStatusSpan.textContent += `mov-width: ${w}`;
       }
 
@@ -801,12 +550,25 @@ export class ShellExplorerWindow extends BaseWindow {
           TEST_SUFFIX
         );
         this._appendLog(`${bar}del-width: ${w}\n${bar}`);
-        if (this._measureDelWidth) this._measureStatusSpan.textContent += ', ';
+        if (this._measureColWidth || this._measureMovWidth) this._measureStatusSpan.textContent += ', ';
         this._measureStatusSpan.textContent += `del-width: ${w}`;
       }
     } finally {
+      await this._clearTerminalLine(msgReader);
       msgReader.dispose();
     }
+  }
+
+  private async _clearTerminalLine(msgReader: MessageReader): Promise<void> {
+    if (!this._sock) { this._appendLog('[dev] no socket\n'); return; }
+
+    if (this._profile.clearNeedsEnd) {
+      this._sock.send(this._profile.keys.end);
+      await msgReader.readUntil(() => true, 100, false);
+    }
+
+    this._sock.send(this._profile.keys.clear);
+    await msgReader.readUntil(() => true, 100, false);
   }
 
   private async _genTables(): Promise<void> {
@@ -830,10 +592,11 @@ export class ShellExplorerWindow extends BaseWindow {
       resizeLock.setLocked(true);
     }
 
-    const msgReader = new MessageReader(sock);
+    const msgReader = new MessageReader(sock, this._msgTimeoutPolicy);
 
     try {
       this._appendLog(`[dev] gen tables start range=${hexToStr(this._genStart)}..${hexToStr(this._genEnd)}\n`);
+      await this._clearTerminalLine(msgReader);
       const progress = new ProgressReport(this._genStart, this._genEnd, 1500, this._measureStatusSpan!);
       const tables = this._profile.widthBuckets.map(b => ({
         bucket: b,
@@ -919,12 +682,9 @@ export class ShellExplorerWindow extends BaseWindow {
         }
       }
 
-      // clear line
-      sock.send(this._profile.keys.clear);
-      await msgReader.readUntil(m => true, 40);
-
       // annotate with movWidths if requested
       if (this._measureColWidth && this._measureMovWidth) {
+        await this._clearTerminalLine(msgReader);
         for (const t of tables.filter(t => t.bucket.annotateMovWidth).map(t => t.table)) {
           for (const r of t._ranges) {
             const samples = [r.start, r.end, Math.floor((r.start + r.end) / 2)];
@@ -945,6 +705,7 @@ export class ShellExplorerWindow extends BaseWindow {
 
       // annotate with delWidths if requested
       if (this._measureColWidth && this._measureDelWidth) {
+        await this._clearTerminalLine(msgReader);
         for (const t of tables.filter(t => t.bucket.annotateDelWidth).map(t => t.table)) {
           for (const r of t._ranges) {
             const samples = [r.start, r.end, Math.floor((r.start + r.end) / 2)];
@@ -969,6 +730,7 @@ export class ShellExplorerWindow extends BaseWindow {
     } catch (e) {
       console.error('error during _genTables', e);
     } finally {
+      await this._clearTerminalLine(msgReader);
       msgReader.dispose();
       if (this._genTableTurboMode) {
         this._toggleAttach(true);
@@ -1031,39 +793,45 @@ function parseWidthFromCUFMsg(msg?: string, mode: 'sum' | 'last' = 'sum'): numbe
   return mode === 'last' ? last : sum;
 }
 
+function parseWidthFromCUBMsg(msg?: string, mode: 'sum' | 'last' = 'sum'): number {
+  if (!msg) return NaN;
 
-// function parseWidthFromCUBMsg(msg?: string, mode: 'sum' | 'last' = 'sum'): number {
-//   if (!msg) return NaN;
+  const re = /\x1b\[(\d*)D/g;
 
-//   const re = /\x1b\[(\d*)D/g;
+  let matched = false;
+  let sum = 0;
+  let last = NaN;
 
-//   let matched = false;
-//   let sum = 0;
-//   let last = NaN;
+  for (let m; (m = re.exec(msg)) !== null;) {
+    matched = true;
 
-//   for (let m; (m = re.exec(msg)) !== null;) {
-//     matched = true;
+    // Empty means implicit 1.
+    // should we treat 0 as 1 too?
+    const s = m[1];
+    const n = s === '' ? 1 : Number(s);
+    if (!Number.isFinite(n)) return NaN;
 
-//     // Empty means implicit 1.
-//     const s = m[1];
-//     const n = s === '' ? 1 : Number(s);
-//     if (!Number.isFinite(n)) return NaN;
+    sum += n;
+    last = n;
+  }
 
-//     sum += n;
-//     last = n;
-//   }
+  if (!matched) return NaN;
+  return mode === 'last' ? last : sum;
+}
 
-//   if (!matched) return NaN;
-//   return mode === 'last' ? last : sum;
-// }
+// Count trailing BS (0x08) to get width.
+// Note: intentionally ignores any earlier redraw noise; only the *suffix* matters.
+function parseWidthFromBSMsg(msg?: string): number {
+  if (!msg) return NaN;
 
-// function parseWidthFromBSMsg(msg?: string): number {
-//   if (!msg) return NaN;
-//   if (!RE_BS_ONLY.test(msg)) return NaN;
+  let n = 0;
+  for (let i = msg.length - 1; i >= 0; i--) {
+    if (msg.charCodeAt(i) === 0x08) n++;
+    else break;
+  }
 
-//   // Each '\x08' is one column left
-//   return msg.length;
-// }
+  return n > 0 ? n : NaN;
+}
 
 const UTF8 = new TextDecoder('utf-8', { fatal: false });
 
@@ -1309,6 +1077,36 @@ function cpRangeCount(start: number, end: number): number {
   return count;
 }
 
+class CircularList {
+  private _buf: string[] = [];
+  private _head = 0;
+
+  constructor(private readonly _max: number) {}
+
+  public push(s: string): void {
+    this._buf.push(s);
+
+    const live = this._buf.length - this._head;
+    const over = live - this._max;
+    if (over > 0) this._head += over;
+
+    // Compact occasionally
+    if (this._head > 1024 && this._head * 2 > this._buf.length) {
+      this._buf = this._buf.slice(this._head);
+      this._head = 0;
+    }
+  }
+
+  public clear(): void {
+    this._buf.length = 0;
+    this._head = 0;
+  }
+
+  public toString(): string {
+    return this._buf.slice(this._head).join('');
+  }
+}
+
 class ProgressReport {
   private _t0 = performance.now();
   private _lastRenderT = 0;
@@ -1373,7 +1171,7 @@ function installResizeLock(term: Terminal): IResizeLock {
 class MessageReader {
   private _pending?: { until: (msg: string) => boolean, resolve: (msg: string | undefined) => void, timer: number };
 
-  constructor(private readonly _socket: WebSocket) {
+  constructor(private readonly _socket: WebSocket, private _policy: IMsgReaderTimeoutPolicy) {
     _socket.addEventListener('message', this._msgHandler);
   }
 
@@ -1396,8 +1194,9 @@ class MessageReader {
       const timer = window.setTimeout(() => {
         this._pending = undefined;
         if (reportTimeout) {
-          throw new Error(`timeout waiting for socket message (${timeoutMs}ms)`);
-          console.error(`timeout waiting for socket message (${timeoutMs}ms)`);
+          const msg = `timeout waiting for socket message (${timeoutMs}ms)`;
+          if (this._policy.shouldThrowOnTimeout()) throw new Error(msg);
+          console.error(msg);
         }
         resolve(undefined);
       }, timeoutMs);
@@ -1414,5 +1213,390 @@ class MessageReader {
       window.clearTimeout(this._pending.timer);
       this._pending = undefined;
     }
+  }
+}
+
+interface IMeasureState {
+  promptWidth?: number;
+  homeOffset?: number;   // expect 0 when HOME ack succeeds
+  endOffset?: number;    // measured after END
+}
+
+function updateMeasureState(state: IMeasureState, msg: string, action: 'home' | 'end' | 'left' | 'right'): IMeasureState {
+  let match: RegExpExecArray | null;
+  const invalidateMotion = (): IMeasureState => {
+    state.homeOffset = undefined;
+    state.endOffset = undefined;
+    return state;
+  };
+
+  if (action === 'home') {
+    const prevHomeOffset = state.homeOffset;
+
+    // HOME defines homeOffset
+    state.homeOffset = 0;
+
+    // optional: learn promptWidth
+    if ((match = RE_CUP.exec(msg))) {
+      const col = parseInt(match[2], 10);
+      state.promptWidth = Number.isFinite(col) ? col - 1 : undefined;
+    } else if (RE_TAIL_CR_CUF.test(msg)) {
+      const n = parseWidthFromCUFMsg(msg); // ensure this sums if multiple CUFs
+      state.promptWidth = Number.isFinite(n) ? n : undefined;
+    }
+
+    // If we are not anchored to end, we can't update endOffset in this coordinate scheme.
+    if (state.endOffset === undefined) {
+      return state;
+    }
+
+    // How far did we move left from the previous position to reach HOME?
+    const deltaLeft =
+      RE_CUB.test(msg) ? parseWidthFromCUBMsg(msg)
+        : RE_BS_ONLY.test(msg) ? parseWidthFromBSMsg(msg)
+          : prevHomeOffset !== undefined ? prevHomeOffset
+            : NaN;
+
+    if (Number.isFinite(deltaLeft)) {
+      // endOffset is distance-from-end; moving left increases it.
+      state.endOffset = state.endOffset + deltaLeft;
+    } else {
+      state.endOffset = undefined;
+    }
+
+    return state;
+  }
+
+  if (action === 'end') {
+    const prevEndOffset = state.endOffset;
+    state.endOffset = 0;
+
+    if (state.homeOffset === undefined) return state;
+
+    let deltaRight: number = NaN;
+
+    if ((match = RE_CUP.exec(msg))) {
+      if (state.promptWidth === undefined) return invalidateMotion();
+      const col = parseInt(match[2], 10);
+      if (!Number.isFinite(col)) return invalidateMotion();
+
+      const newHomeOffset = col - 1 - state.promptWidth;
+      deltaRight = newHomeOffset - state.homeOffset;
+    } else if (RE_TAIL_CR_CUF.test(msg)) {
+      if (state.promptWidth === undefined) return invalidateMotion();
+      const n = parseWidthFromCUFMsg(msg);
+      if (!Number.isFinite(n)) return invalidateMotion();
+
+      const newHomeOffset = n - state.promptWidth;
+      deltaRight = newHomeOffset - state.homeOffset;
+    } else if (RE_CUF.test(msg)) {
+      const n = parseWidthFromCUFMsg(msg);
+      if (Number.isFinite(n)) deltaRight = n;
+    } else if (prevEndOffset !== undefined) {
+      deltaRight = prevEndOffset;
+    }
+
+    if (Number.isFinite(deltaRight)) {
+      state.homeOffset += deltaRight;
+    } else {
+      state.homeOffset = undefined;
+    }
+
+    return state;
+  }
+
+  if (action === 'left' || action === 'right') {
+    // If neither coordinate is known, we can't update anything.
+    if (state.homeOffset === undefined && state.endOffset === undefined) {
+      return state;
+    }
+
+    // ABSOLUTE position
+    if ((match = RE_CUP.exec(msg))) {
+      if (state.promptWidth === undefined || state.homeOffset === undefined) {
+        return invalidateMotion();
+      }
+      const col = parseInt(match[2], 10);
+      if (!Number.isFinite(col)) {
+        return invalidateMotion();
+      }
+
+      const newHomeOffset = (col - 1) - state.promptWidth;
+      const deltaH = newHomeOffset - state.homeOffset;
+
+      state.homeOffset += deltaH;
+      if (state.endOffset !== undefined) state.endOffset -= deltaH;
+      return state;
+    }
+    if (RE_TAIL_CR_CUF.test(msg)) {
+      if (state.promptWidth === undefined || state.homeOffset === undefined) {
+        return invalidateMotion();
+      }
+      const absCol = parseWidthFromCUFMsg(msg);
+      if (!Number.isFinite(absCol)) {
+        return invalidateMotion();
+      }
+
+      const newHomeOffset = absCol - state.promptWidth;
+      const deltaH = newHomeOffset - state.homeOffset;
+
+      state.homeOffset += deltaH;
+      if (state.endOffset !== undefined) state.endOffset -= deltaH;
+      return state;
+    }
+
+    // Compute Δh (delta in homeOffset coordinates)
+    // Positive means move right; negative means move left.
+    const deltaH =
+      RE_CUF.test(msg) ? parseWidthFromCUFMsg(msg)
+        : RE_CUB.test(msg) ? -parseWidthFromCUBMsg(msg)
+          : RE_BS_ONLY.test(msg) ? -parseWidthFromBSMsg(msg)
+            : NaN;
+
+    if (!Number.isFinite(deltaH)) {
+      return invalidateMotion();
+    }
+
+    if (state.homeOffset !== undefined) {
+      state.homeOffset += deltaH;
+      if (!Number.isFinite(state.homeOffset)) state.homeOffset = undefined;
+    }
+
+    if (state.endOffset !== undefined) {
+      state.endOffset -= deltaH;
+      if (!Number.isFinite(state.endOffset)) state.endOffset = undefined;
+    }
+
+    return state;
+  }
+  return state;
+}
+
+function isHomeAck(msg: string): boolean {
+  return RE_CUB.test(msg) || RE_TRAILING_BS.test(msg) || RE_CUP.test(msg) || RE_TAIL_CR_CUF.test(msg) || RE_CUV.test(msg);
+}
+
+function isEndAck(msg: string): boolean {
+  return RE_CUF.test(msg) || RE_CUP.test(msg) || RE_TAIL_CR_CUF.test(msg);
+}
+
+function isLeftAck(msg: string): boolean {
+  return isHomeAck(msg);
+}
+
+function isDeleteAck(msg: string): boolean {
+  return (
+    msg.includes('\x08') ||            // BS anywhere (covers BS+EL, BS+spaces+BS, etc.)
+    RE_CUB.test(msg) ||
+    RE_CUF.test(msg) ||
+    RE_CUP.test(msg) ||
+    RE_TAIL_CR_CUF.test(msg) ||
+    /\x1b\[K/.test(msg) ||            // EL (erase to line end)
+    /\x1b\[\d*P/.test(msg)            // DCH (delete char) variants
+  );
+}
+
+
+export async function measureColWidth(
+  socket: WebSocket,
+  readUntil: MessageAwaiter,
+  payload: string,
+  prefix: string,
+  suffix: string,
+  keys: IKeymap,
+  clearNeedsEnd: boolean = false,
+): Promise<number> {
+  const state = {} as IMeasureState;
+  let isAtEnd = false;
+
+  try {
+    socket.send(prefix + payload + suffix);
+    const printed = await readUntil(m => m.includes(suffix), 1000);
+    if (!printed) return NaN;
+    state.endOffset = 0;
+
+    socket.send(keys.home);
+    const homeAck = await readUntil(isHomeAck, 1100);
+    if (!homeAck) return NaN;
+    if (RE_CUV.test(homeAck)) return NaN; // CUU on HOME when ramping means wrapping occurred
+
+    updateMeasureState(state, homeAck, 'home');
+
+    if (state.endOffset !== undefined) {
+      // Short-circuit result
+      return state.endOffset - (prefix.length + suffix.length);
+    }
+
+    // END
+    socket.send(keys.end);
+    const endAck = await readUntil(isEndAck, 1200);
+    if (!endAck) return NaN;
+    isAtEnd = true;
+
+    updateMeasureState(state, endAck, 'end');
+
+    if (state.homeOffset !== undefined) {
+      return state.homeOffset - (prefix.length + suffix.length);
+    }
+
+    return NaN;
+  } finally {
+    if (clearNeedsEnd && !isAtEnd) {
+      socket.send(keys.end);
+      await readUntil(() => true, 20);
+    }
+    socket.send(keys.clear);
+    await readUntil(() => true, 30);
+  }
+}
+
+async function measureMovWidth(
+  socket: WebSocket,
+  readUntil: MessageAwaiter,
+  payload: string,
+  prefix: string,
+  suffix: string,
+  keys: IKeymap,
+  clearNeedsEnd: boolean = false,
+): Promise<number> {
+  const state = {} as IMeasureState;
+
+  const MAX_LEFT = 16;
+
+  try {
+    socket.send(prefix + payload + suffix);
+    const printed = await readUntil(m => m.includes(suffix), 1000);
+    if (!printed) return NaN;
+    state.endOffset = 0;
+
+    socket.send(keys.home);
+    const homeAck = await readUntil(isHomeAck, 1100);
+    if (!homeAck) return NaN;
+    if (RE_CUV.test(homeAck)) return NaN; // wrapping/ramping: bail
+
+    updateMeasureState(state, homeAck, 'home');
+
+    socket.send(keys.end);
+    const endAck = await readUntil(isEndAck, 1200);
+    if (!endAck) return NaN;
+
+    updateMeasureState(state, endAck, 'end');
+
+    // We need total width as homeOffset so we can walk it down to 0 via LEFT presses.
+    if (state.homeOffset === undefined || !Number.isFinite(state.homeOffset)) {
+      return NaN;
+    }
+
+    let leftCount = 0;
+    while (state.homeOffset !== 0 && leftCount < MAX_LEFT) {
+      // console.log(`measureState before LEFT #${leftCount + 1}:`, state);
+      socket.send(keys.left);
+      const leftAck = await readUntil(isLeftAck, 900);
+      if (!leftAck) return NaN;
+
+      updateMeasureState(state, leftAck, 'left');
+
+      // If we lose the coordinate, we're done (failure)
+      if (state.homeOffset === undefined || !Number.isFinite(state.homeOffset)) {
+        return NaN;
+      }
+
+      // If we overshot HOME, bail.
+      if (state.homeOffset < 0) return NaN;
+
+      leftCount++;
+    }
+
+    if (state.homeOffset !== 0) return NaN;
+
+    // Subtract the ASCII scaffolding.
+    return leftCount - (prefix.length + suffix.length);
+  } finally {
+    if (clearNeedsEnd) {
+      socket.send(keys.end);
+      await readUntil(() => true, 20);
+    }
+    socket.send(keys.clear);
+    await readUntil(() => true, 30);
+  }
+}
+
+export async function measureDelWidth(
+  socket: WebSocket,
+  readUntil: MessageAwaiter,
+  payload: string,
+  prefix: string,
+  suffix: string,
+  keys: IKeymap,
+  clearNeedsEnd: boolean = false,
+): Promise<number> {
+  const state = {} as IMeasureState;
+  let isAtEnd = false;
+
+  try {
+    socket.send(prefix + prefix + payload + suffix); // double prefix to ensure we can delete fully
+    const printed = await readUntil(m => m.includes(suffix), 1000);
+    if (!printed) return NaN;
+    state.endOffset = 0;
+    isAtEnd = true;
+
+    socket.send(keys.home);
+    let ack = await readUntil(isHomeAck, 1100);
+    if (!ack) return NaN;
+    if (RE_CUV.test(ack)) return NaN; // wrapping/ramping guard
+    updateMeasureState(state, ack, 'home');
+    isAtEnd = false;
+
+    socket.send(keys.end);
+    ack = await readUntil(isEndAck, 1200);
+    if (!ack) return NaN;
+    updateMeasureState(state, ack, 'end');
+    isAtEnd = true;
+
+    if (state.homeOffset === undefined) return NaN;
+
+    const doneHome = prefix.length; // leave one prefix behind
+    const MAX_DEL = 80;             // keep it safely above expected emoji widths
+    let nDel = 0;
+
+    while (nDel < MAX_DEL) {
+      // console.log(`measureState before DEL #${nDel + 1}:`, state);
+      nDel++;
+      socket.send(keys.del);
+      const delAck = await readUntil(isDeleteAck, 900);
+      if (!delAck) return NaN;
+
+      // Re-anchor: HOME then END
+      socket.send(keys.home);
+      const h = await readUntil(isHomeAck, 1100);
+      isAtEnd = false;
+      if (!h) return NaN;
+      if (RE_CUV.test(h)) return NaN;
+      updateMeasureState(state, h, 'home');
+
+      socket.send(keys.end);
+      const e = await readUntil(isEndAck, 1200);
+      isAtEnd = true;
+      if (!e) return NaN;
+      updateMeasureState(state, e, 'end');
+
+      if (state.homeOffset === undefined) return NaN;
+
+      if (state.homeOffset === doneHome) {
+        return nDel - (prefix.length + suffix.length);
+      }
+
+      // bail if we overshot
+      if (state.homeOffset < doneHome) return NaN;
+    }
+
+    return NaN;
+  } finally {
+    if (clearNeedsEnd && !isAtEnd) {
+      socket.send(keys.end);
+      await readUntil(() => true, 20);
+    }
+    socket.send(keys.clear);
+    await readUntil(() => true, 30);
   }
 }
