@@ -1,0 +1,21 @@
+{
+  "name": "@xterm/addon-cell-compat",
+  "version": "0.1.0",
+  "author": {
+    "name": "The xterm.js authors",
+    "url": "https://xtermjs.org/"
+  },
+  "main": "lib/addon-cell-compat.js",
+  "module": "lib/addon-cell-compat.mjs",
+  "types": "typings/addon-cell-compat.d.ts",
+  "repository": "https://github.com/xtermjs/xterm.js/tree/master/addons/addon-cell-compat",
+  "license": "MIT",
+  "keywords": ["terminal", "xterm", "xterm.js", "compat", "cell", "grid", "unicode", "grapheme", "width"],
+  "scripts": {
+    "build": "../../node_modules/.bin/tsc -p .",
+    "prepackage": "npm run build",
+    "package": "../../node_modules/.bin/webpack",
+    "prepublishOnly": "npm run package",
+    "start": "node ../../demo/start"
+  }
+}

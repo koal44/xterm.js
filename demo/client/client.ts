@@ -40,6 +40,7 @@ import { WebglAddon } from '@xterm/addon-webgl';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { UnicodeGraphemesAddon } from '@xterm/addon-unicode-graphemes';
 import { UcWidthAddon } from '@xterm/addon-uc-width';
+import { CellCompatAddon } from '@xterm/addon-cell-compat';
 import { AddonCollection, type AddonType, type IDemoAddon } from './types';
 
 export interface IWindowWithTerminal extends Window {
@@ -57,6 +58,7 @@ export interface IWindowWithTerminal extends Window {
   Unicode11Addon?: typeof Unicode11Addon;
   UnicodeGraphemesAddon?: typeof UnicodeGraphemesAddon;
   UcWidthAddon?: typeof UcWidthAddon;
+  CellCompatAddon?: typeof CellCompatAddon;
   LigaturesAddon?: typeof LigaturesAddon;
 }
 declare let window: IWindowWithTerminal;
@@ -207,6 +209,7 @@ if (document.location.pathname === '/test') {
   window.Unicode11Addon = Unicode11Addon;
   window.UnicodeGraphemesAddon = UnicodeGraphemesAddon;
   window.UcWidthAddon = UcWidthAddon;
+  window.CellCompatAddon = CellCompatAddon;
   window.LigaturesAddon = LigaturesAddon;
   window.WebLinksAddon = WebLinksAddon;
   window.WebglAddon = WebglAddon;

@@ -31,6 +31,7 @@ const addons = [
   'unicode-graphemes',
   'unicode11',
   'uc-width',
+  'cell-compat',
   'web-fonts',
   'web-links',
   'webgl',

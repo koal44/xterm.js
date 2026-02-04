@@ -62,6 +62,9 @@ jobs:
           ./addons/addon-uc-width/lib/* \
           ./addons/addon-uc-width/out/* \
           ./addons/addon-uc-width/out-*/* \
+          ./addons/addon-cell-compat/lib/* \
+          ./addons/addon-cell-compat/out/* \
+          ./addons/addon-cell-compat/out-*/* \
           ./addons/addon-web-links/lib/* \
           ./addons/addon-web-links/out/* \
           ./addons/addon-web-links/out-*/* \
@@ -233,6 +236,8 @@ jobs:
       run: npm run test-integration-${{ matrix.browser }} --workers=50% --forbid-only --suite=addon-web-fonts
     - name: Integration tests (addon-uc-width)
       run: npm run test-integration-${{ matrix.browser }} --workers=50% --forbid-only --suite=addon-uc-width
+    - name: Integration tests (addon-cell-compat)
+      run: npm run test-integration-${{ matrix.browser }} --workers=50% --forbid-only --suite=addon-cell-compat
     - name: Integration tests (addon-web-links)
       run: npm run test-integration-${{ matrix.browser }} --workers=50% --forbid-only --suite=addon-web-links
     - name: Integration tests (addon-webgl)
