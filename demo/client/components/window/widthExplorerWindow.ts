@@ -23,6 +23,7 @@
 import { BaseWindow } from './baseWindow';
 import type { AddonCollection } from 'types';
 import type { Terminal } from '@xterm/xterm';
+import { CellCompatAddon } from '@xterm/addon-cell-compat';
 import { BrowserStorage } from 'components/window/widthExplorer/browserStorage';
 import { addRow, mkButton, mkCheckbox, mkLabeledInput, mkNumericUpDown, mkSelect } from 'components/window/widthExplorer/domUtil';
 import { Measurer } from 'components/window/widthExplorer/measurer';
@@ -30,6 +31,7 @@ import { MeasuredWidths, MeasuredTable } from 'components/window/widthExplorer/m
 import { ignoreUnprintablesInTable } from 'components/window/widthExplorer/unprintables';
 import { decodeData, escapeForLog, formatCodePoints, hexToStr } from 'components/window/widthExplorer/stringUtil';
 import { CircularList } from 'components/window/widthExplorer/circularList';
+import { bashCompatRanges, fishCompatRanges, pwshCompatRanges, zshCompatRanges } from 'components/window/widthExplorer/compatTablePresets';
 
 // choose ascii single char to avoid app splitting suffix across messages
 const TEST_PREFIX = '«';
@@ -43,6 +45,7 @@ const TESTS = [
   '🇺🇳',
   '͸',  // an unprintable char
   '͸͹', // two unprintable chars
+  '\u0301\u0301A'
 ];
 
 const TURBO_COLS = 600; // widen columns for turbo mode
@@ -69,6 +72,7 @@ export interface IAppProfile {
   clearLineNeedsEnd: boolean; // whether clear key needs an END before it to work properly
   init: string[]; // commands to run when switching into this profile
   upkeep?: IUpkeepCmd; // commands to run periodically to keep the line editor happy
+  compatPreset: MeasuredTable; // preset compatibility table
 }
 
 export const APP_PROFILES: IAppProfile[] = [
@@ -92,6 +96,7 @@ export const APP_PROFILES: IAppProfile[] = [
       `bind '"\\C-?": backward-delete-char'`, // DEL/Backspace (0x7f)
       `bind '"\\C-l": clear-screen'`,         // Clear screen (Ctrl+L, 0x0c)
     ],
+    compatPreset: new MeasuredTable('bashCompatTable', bashCompatRanges),
   },
   {
     id: 'zsh',
@@ -116,6 +121,7 @@ export const APP_PROFILES: IAppProfile[] = [
       `bindkey '^?'   backward-delete-char`, // \x7f
       `bindkey '^L' clear-screen`,           // \x0c
     ],
+    compatPreset: new MeasuredTable('zshCompatTable', zshCompatRanges),
     //   // zsh/ZLE private byte stash in 0xe000..0xe0ff for lossless round-tripping (ISO 10646)
   },
   {
@@ -144,6 +150,7 @@ export const APP_PROFILES: IAppProfile[] = [
       `bind '\\cL' clear-screen`,            // \x0c
     ],
     upkeep: { cmd: 'true\r', everyRuns: 100, timeoutMs: 800 },
+    compatPreset: new MeasuredTable('fishCompatTable', fishCompatRanges),
   },
   {
     id: 'pwsh',
@@ -163,6 +170,7 @@ export const APP_PROFILES: IAppProfile[] = [
       // `Set-PSReadLineOption -Colors @{Command='white';Default='white';`, ... doesn't work
       `Set-PSReadLineKeyHandler -Chord Ctrl+l -Function ClearScreen`,
     ],
+    compatPreset: new MeasuredTable('pwshCompatTable', pwshCompatRanges),
   }
 ];
 
@@ -213,6 +221,9 @@ export class WidthExplorerWindow extends BaseWindow {
   private _log = new CircularList(this._logMaxLines);
   private _logFlushScheduled = false;
   private _logFlushTimer: number | undefined;
+
+  private _cellCompat: CellCompatAddon | undefined;
+  private _prevUcProvider: string | undefined;
 
   constructor(
     terminal: Terminal,
@@ -384,7 +395,7 @@ export class WidthExplorerWindow extends BaseWindow {
         async () => {
           if (!this._store || !this._profile) return;
 
-          const newRanges = this._workingTable._ranges;
+          const newRanges = this._workingTable.ranges;
           const existing = this._store.loadRanges() ?? [];
 
           // only save when data has full measurements
@@ -401,11 +412,11 @@ export class WidthExplorerWindow extends BaseWindow {
           const merged = new MeasuredTable('merged', existing);
           for (const r of newRanges) merged.upsertRange(r);
 
-          this._store.saveRanges(merged._ranges);
+          this._store.saveRanges(merged.ranges);
 
           this._clearLog();
           this._appendLog(
-            `[dev] saved (merge) new=${newRanges.length} storedWas=${existing.length} merged=${merged._ranges.length}\n`
+            `[dev] saved (merge) new=${newRanges.length} storedWas=${existing.length} merged=${merged.ranges.length}\n`
           );
         }
       ),
@@ -448,6 +459,28 @@ export class WidthExplorerWindow extends BaseWindow {
 
     this._measureStatusSpan = document.createElement('span');
     addRow(root, 'status: ', this._measureStatusSpan);
+
+    // CellCompat
+    root.appendChild(document.createElement('hr'));
+    addRow(root, 'cell compat addon: ',
+      mkCheckbox('enable', 'Enable CellCompatAddon', false, v => {
+        const enabled = v;
+        if (!this._cellCompat) {
+          this._cellCompat = new CellCompatAddon();
+          this._terminal.loadAddon(this._cellCompat);
+        }
+
+        if (enabled) {
+          this._prevUcProvider = this._terminal.unicode.activeVersion;
+          if (!this._profile.compatPreset.ranges) return;
+          this._cellCompat.loadCompatTable(this._profile.compatPreset);
+          this._terminal.unicode.activeVersion = 'compat';
+        } else {
+          this._terminal.unicode.activeVersion = this._prevUcProvider || '6';
+        }
+      }).label,
+    );
+
 
     // Output
     const pre = document.createElement('pre');
@@ -711,13 +744,13 @@ export class WidthExplorerWindow extends BaseWindow {
         }
       }
 
-      for (const r of compatTable._ranges) {
+      for (const r of compatTable.ranges) {
         this._workingTable.upsertRange(r);
       }
 
       if (this._genAudit) {
         const singletons: number[] = [];
-        for (const r of this._workingTable._ranges) if (r.start === r.end) singletons.push(r.start);
+        for (const r of this._workingTable.ranges) if (r.start === r.end) singletons.push(r.start);
 
         for (const cp of singletons) {
           // measure it until it's consistent 3x
@@ -749,7 +782,7 @@ export class WidthExplorerWindow extends BaseWindow {
 
       if (this._genAudit) {
         let auditWarnings = 0;
-        for (const r of this._workingTable._ranges) {
+        for (const r of this._workingTable.ranges) {
           const wStart = await measurer.run(String.fromCodePoint(r.start), measureOpts, this._genLogPerf);
           const wEnd   = await measurer.run(String.fromCodePoint(r.end), measureOpts, this._genLogPerf);
           if (!MeasuredWidths.equal(r.widths, wStart)) {
@@ -839,7 +872,7 @@ function cpRangeCount(start: number, end: number): number {
   if (end < start) return 0;
 
   let count = end - start + 1;
-  for (const r of getSkipTable()._ranges) {
+  for (const r of getSkipTable().ranges) {
     const ovStart = Math.max(start, r.start);
     const ovEnd = Math.min(end, r.end);
     const overlap = ovStart <= ovEnd ? (ovEnd - ovStart + 1) : 0;

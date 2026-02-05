@@ -25,7 +25,7 @@ export interface IMeasuredRange { start: number, end: number, widths?: MeasuredW
 export type CanMergeRangeFn = (last: IMeasuredRange, next: IMeasuredRange) => boolean;
 
 export class MeasuredTable {
-  public _ranges: IMeasuredRange[] = [];
+  public ranges: IMeasuredRange[] = [];
   private static _canMergeFn: CanMergeRangeFn = (last, next) => MeasuredWidths.equal(last.widths, next.widths);
 
   constructor(public label: string, initialRanges: IMeasuredRange[] = []) {
@@ -36,13 +36,13 @@ export class MeasuredTable {
 
   // public get ranges(): ReadonlyArray<IMeasuredRange> { return this._ranges; }
 
-  public clear(): void { this._ranges.length = 0; }
+  public clear(): void { this.ranges.length = 0; }
 
   public add(cp: number, m: MeasuredWidths = {}, canMergeAdjacent = MeasuredTable._canMergeFn): void {
-    const last = this._ranges[this._ranges.length - 1];
+    const last = this.ranges[this.ranges.length - 1];
     const next = { start: cp, end: cp, widths: { ...m } };
     if (!last) {
-      this._ranges.push(next);
+      this.ranges.push(next);
       return;
     }
 
@@ -52,16 +52,16 @@ export class MeasuredTable {
       last.end = cp;
       return;
     }
-    this._ranges.push(next);
+    this.ranges.push(next);
   }
 
   public addRange(next: IMeasuredRange, canMergeAdjacent = MeasuredTable._canMergeFn): void {
     const { start, end, widths: w } = next;
     if (start > end) throw new Error(`addRange invalid ${start}..${end}`);
 
-    const last = this._ranges[this._ranges.length - 1];
+    const last = this.ranges[this.ranges.length - 1];
     if (!last) {
-      this._ranges.push({ start, end, widths: w ? { ...w } : undefined });
+      this.ranges.push({ start, end, widths: w ? { ...w } : undefined });
       return;
     }
 
@@ -72,7 +72,7 @@ export class MeasuredTable {
       return;
     }
 
-    this._ranges.push({ start, end, widths: w ? { ...w } : undefined });
+    this.ranges.push({ start, end, widths: w ? { ...w } : undefined });
   }
 
   public upsertRange(x: IMeasuredRange, canMergeAdjacent: CanMergeRangeFn = MeasuredTable._canMergeFn): void {
@@ -93,7 +93,7 @@ export class MeasuredTable {
 
     const paint: IMeasuredRange = { start: xs, end: xe, widths: xw ? { ...xw } : undefined };
 
-    for (const r of this._ranges) {
+    for (const r of this.ranges) {
       // r fully left of x
       if (r.end < xs) {
         push(r);
@@ -131,18 +131,18 @@ export class MeasuredTable {
     }
 
     // mutate in place
-    this._ranges.length = 0;
-    this._ranges.push(...out);
+    this.ranges.length = 0;
+    this.ranges.push(...out);
   }
 
   public toStr(): string {
     const out: string[] = [];
 
-    const cpCount = this._ranges.reduce((sum, r) => sum + (r.end - r.start + 1), 0);
-    out.push(`// [ranges=${this._ranges.length}; codePoints=${cpCount}]`);
+    const cpCount = this.ranges.reduce((sum, r) => sum + (r.end - r.start + 1), 0);
+    out.push(`// [ranges=${this.ranges.length}; codePoints=${cpCount}]`);
     out.push(`const ${this.label}: IMeasuredRange[] = [`);
 
-    for (const { start, end, widths: m } of this._ranges) {
+    for (const { start, end, widths: m } of this.ranges) {
       const sHex = hexToStr(start);
       const eHex = hexToStr(end);
 
@@ -161,16 +161,16 @@ export class MeasuredTable {
   }
 
   public has(cp?: number): boolean {
-    if (!this._ranges.length || (cp === undefined)) {
+    if (!this.ranges.length || (cp === undefined)) {
       return false;
     }
 
     let lo = 0;
-    let hi = this._ranges.length - 1;
+    let hi = this.ranges.length - 1;
 
     while (lo <= hi) {
       const mid = (lo + hi) >> 1;
-      const { start, end } = this._ranges[mid];
+      const { start, end } = this.ranges[mid];
 
       if (cp < start) hi = mid - 1;
       else if (cp > end) lo = mid + 1;

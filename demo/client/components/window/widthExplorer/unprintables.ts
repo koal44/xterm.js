@@ -725,7 +725,7 @@ export function ignoreUnprintablesInTable(table: MeasuredTable, label: string): 
   };
 
   const out = new MeasuredTable(label);
-  for (const r of table._ranges) {
+  for (const r of table.ranges) {
     out.addRange(r, hideUnprintablesJoinFn);
   }
   return out;
