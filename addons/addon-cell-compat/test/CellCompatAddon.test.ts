@@ -103,10 +103,10 @@ async function termEval<R>(op: TermOp): Promise<R> {
 
 const versions = () => termEval<string[]>({ k: 'versions' });
 const activeVersion = () => termEval<string>({ k: 'activeVersion' });
-// const strWidth = (s: string) => termEval<number>({ k: 'strWidth', s });
-// const write = (data: string) => termEval<void>({ k: 'write', data });
-// const cursorX = () => termEval<number>({ k: 'cursorX' });
-// const dumpClusters = () => termEval<Cluster[]>({ k: 'dumpClusters' });
+const strWidth = (s: string) => termEval<number>({ k: 'strWidth', s });
+const write = (data: string) => termEval<void>({ k: 'write', data });
+const cursorX = () => termEval<number>({ k: 'cursorX' });
+const dumpClusters = () => termEval<Cluster[]>({ k: 'dumpClusters' });
 
 let ctx: ITestContext;
 const VERSION = 'compat';
@@ -138,3 +138,42 @@ test.describe('CellCompatAddon', () => {
   });
 
 });
+
+// test.describe('UcWidthAddon', () => {
+//   test.beforeEach(async () => {
+//     await ctx.page.evaluate((ver) => {
+//       const w = window as unknown as ITestWindow;
+//       w.term.reset();
+//       w.unicode17?.dispose();
+//       w.unicode17 = new w.UcWidthAddon();
+//       w.term.loadAddon(w.unicode17);
+//       w.term.unicode.activeVersion = ver;
+//     }, VERSION);
+//   });
+
+//   test('registers version and computes expected widths', async () => {
+//     expect(await versions()).toContain(VERSION);
+//     expect(await activeVersion()).toBe(VERSION);
+//     expect(await strWidth('🤣🤣🤣🤣🤣🤣🤣🤣🤣🤣')).toBe(20);
+//     expect(await strWidth('a\u0301')).toBe(1);
+//     expect(await strWidth('\u{1F468}\u{200D}\u{1F33E}')).toBe(2);
+//   });
+
+//   test('dumpClusters: ASCII "hello"', async () => {
+//     await write('hello');
+
+//     expect(await cursorX()).toBe(5);
+//     expect(await dumpClusters()).toEqual([
+//       [[0x68], 1], [[0x65], 1], [[0x6c], 1], [[0x6c], 1], [[0x6f], 1] ]);
+//   });
+
+//   test('dumpClusters: 👨‍🌾 (ZWJ sequence) yields one cluster width 2', async () => {
+//     const farmer = '👨‍🌾'; // '\u{1F468}\u{200D}\u{1F33E}'
+//     await write(farmer);
+
+//     expect(await cursorX()).toBe(2);
+//     expect(await dumpClusters()).toEqual([
+//       [[0x1F468, 0x200D, 0x1F33E], 2],
+//     ]);
+//   });
+// });
