@@ -11,7 +11,7 @@ import { EscapeSequenceParser } from 'common/parser/EscapeSequenceParser';
 import { Disposable } from 'vs/base/common/lifecycle';
 import { StringToUtf32, stringFromCodePoint, Utf8ToUtf32 } from 'common/input/TextDecoder';
 import { IParsingState, IEscapeSequenceParser, IParams, IFunctionIdentifier } from 'common/parser/Types';
-import { NULL_CELL_CODE, NULL_CELL_WIDTH, Attributes, FgFlags, BgFlags, UnderlineStyle } from 'common/buffer/Constants';
+import { Attributes, FgFlags, BgFlags, UnderlineStyle } from 'common/buffer/Constants';
 import { AttributeData, DEFAULT_ATTR_DATA } from 'common/buffer/AttributeData';
 import { ICoreService, IBufferService, IOptionsService, ILogService, ICoreMouseService, ICharsetService, IUnicodeService, LogLevelEnum, IOscLinkService } from 'common/services/Services';
 import { UnicodeService } from 'common/services/UnicodeService';
@@ -537,7 +537,7 @@ export class InputHandler extends Disposable implements IInputHandler {
 
     // handle wide chars: reset start_cell-1 if we would overwrite the second cell of a wide char
     if (this._activeBuffer.x && end - start > 0 && bufferRow.getWidth(this._activeBuffer.x - 1) === 2) {
-      bufferRow.setCellFromCodepoint(this._activeBuffer.x - 1, 0, 1, curAttr);
+      bufferRow.setNullCell(this._activeBuffer.x - 1, curAttr);
     }
 
     let precedingJoinState = this._parser.precedingJoinState;
@@ -603,12 +603,11 @@ export class InputHandler extends Disposable implements IInputHandler {
           if (oldWidth > 0) {
             // Combining character widens 1 column to 2.
             // Move old character to next line.
-            bufferRow.copyCellsFrom(oldRow,
-              oldCol, 0, oldWidth, false);
+            bufferRow.copyCellsFrom(oldRow, oldCol, 0, oldWidth, false);
           }
           // clear left over cells to the right
           while (oldCol < cols) {
-            oldRow.setCellFromCodepoint(oldCol++, 0, 1, curAttr);
+            oldRow.setNullCell(oldCol++, curAttr);
           }
         } else {
           this._activeBuffer.x = cols - 1;
@@ -629,10 +628,9 @@ export class InputHandler extends Disposable implements IInputHandler {
         // if empty cell after fullwidth, need to go 2 cells back
         // it is save to step 2 cells back here
         // since an empty cell is only set by fullwidth chars
-        bufferRow.addCodepointToCell(this._activeBuffer.x - offset,
-          code, chWidth);
+        bufferRow.addCodepointToCell(this._activeBuffer.x - offset, code, chWidth);
         for (let delta = chWidth - oldWidth; --delta >= 0;) {
-          bufferRow.setCellFromCodepoint(this._activeBuffer.x++, 0, 0, curAttr);
+          bufferRow.setEmptyCell(this._activeBuffer.x++, curAttr);
         }
         continue;
       }
@@ -645,7 +643,7 @@ export class InputHandler extends Disposable implements IInputHandler {
         // a halfwidth char any fullwidth shifted there is lost
         // and will be set to empty cell
         if (bufferRow.getWidth(cols - 1) === 2) {
-          bufferRow.setCellFromCodepoint(cols - 1, NULL_CELL_CODE, NULL_CELL_WIDTH, curAttr);
+          bufferRow.setNullCell(cols - 1, curAttr);
         }
       }
 
@@ -658,7 +656,7 @@ export class InputHandler extends Disposable implements IInputHandler {
       if (chWidth > 0) {
         while (--chWidth) {
           // other than a regular empty cell a cell following a wide char has no width
-          bufferRow.setCellFromCodepoint(this._activeBuffer.x++, 0, 0, curAttr);
+          bufferRow.setEmptyCell(this._activeBuffer.x++, curAttr);
         }
       }
     }
@@ -667,7 +665,7 @@ export class InputHandler extends Disposable implements IInputHandler {
 
     // handle wide chars: reset cell to the right if it is second cell of a wide char
     if (this._activeBuffer.x < cols && end - start > 0 && bufferRow.getWidth(this._activeBuffer.x) === 0 && !bufferRow.hasContent(this._activeBuffer.x)) {
-      bufferRow.setCellFromCodepoint(this._activeBuffer.x, 0, 1, curAttr);
+      bufferRow.setNullCell(this._activeBuffer.x, curAttr);
     }
 
     this._dirtyRowTracker.markDirty(this._activeBuffer.y);

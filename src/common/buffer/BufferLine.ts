@@ -190,6 +190,14 @@ export class BufferLine implements IBufferLine {
     this._data[index * CELL_SIZE + Cell.BG] = attrs.bg;
   }
 
+  public setNullCell(index: number, attrs: IAttributeData): void {
+    this.setCellFromCodepoint(index, 0, NULL_CELL_WIDTH, attrs);
+  }
+
+  public setEmptyCell(index: number, attrs: IAttributeData): void {
+    this.setCellFromCodepoint(index, 0, 0, attrs);
+  }
+
   /**
    * Add a codepoint to a cell from input handler.
    * During input stage combining chars with a width of 0 follow and stack

@@ -223,8 +223,10 @@ export interface IBufferLine {
   isWrapped: boolean;
   loadCell(index: number, cell: ICellData): ICellData;
   setCell(index: number, cell: ICellData): void;
-  setCellFromCodepoint(index: number, codePoint: number, width: number, attrs: IAttributeData): void;
-  addCodepointToCell(index: number, codePoint: number, width: number): void;
+  setCellFromCodepoint(index: number, codePoint: number, width: number, attrs: IAttributeData, props?: number): void;
+  setNullCell(index: number, attrs: IAttributeData): void;
+  setEmptyCell(index: number, attrs: IAttributeData): void;
+  addCodepointToCell(index: number, codePoint: number, width: number, props?: number): void;
   insertCells(pos: number, n: number, ch: ICellData): void;
   deleteCells(pos: number, n: number, fill: ICellData): void;
   replaceCells(start: number, end: number, fill: ICellData, respectProtect?: boolean): void;
