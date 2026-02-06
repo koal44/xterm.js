@@ -144,7 +144,6 @@ if (config.addon) {
       "@xterm/addon-web-links": "./addons/addon-web-links/lib/addon-web-links.mjs",
       "@xterm/addon-webgl": "./addons/addon-webgl/lib/addon-webgl.mjs",
       "@xterm/addon-unicode11": "./addons/addon-unicode11/lib/addon-unicode11.mjs",
-      "@xterm/addon-uc-width": "./addons/addon-uc-width/lib/addon-uc-width.mjs",
       "@xterm/addon-cell-compat": "./addons/addon-cell-compat/lib/addon-cell-compat.mjs",
       "@xterm/addon-unicode-graphemes": "./addons/addon-unicode-graphemes/lib/addon-unicode-graphemes.mjs",
 

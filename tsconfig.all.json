@@ -20,7 +20,6 @@
     { "path": "./addons/addon-web-fonts" },
     { "path": "./addons/addon-web-links" },
     { "path": "./addons/addon-webgl" },
-    { "path": "./addons/addon-uc-width" },
     { "path": "./addons/addon-cell-compat" }
   ]
 }

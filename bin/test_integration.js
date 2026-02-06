@@ -30,7 +30,6 @@ const addons = [
   'serialize',
   'unicode-graphemes',
   'unicode11',
-  'uc-width',
   'cell-compat',
   'web-fonts',
   'web-links',
