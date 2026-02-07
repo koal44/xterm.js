@@ -3,8 +3,9 @@
  * @license MIT
  */
 
+import { DEFAULT_ATTR_DATA } from 'common/buffer/AttributeData';
 import { CircularList } from 'common/CircularList';
-import { IBufferLine, ICellData } from 'common/Types';
+import { IBufferLine } from 'common/Types';
 
 export interface INewLayoutResult {
   layout: number[];
@@ -18,10 +19,9 @@ export interface INewLayoutResult {
  * @param oldCols The columns before resize
  * @param newCols The columns after resize.
  * @param bufferAbsoluteY The absolute y position of the cursor (baseY + cursorY).
- * @param nullCell The cell data to use when filling in empty cells.
  * @param reflowCursorLine Whether to reflow the line containing the cursor.
  */
-export function reflowLargerGetLinesToRemove(lines: CircularList<IBufferLine>, oldCols: number, newCols: number, bufferAbsoluteY: number, nullCell: ICellData, reflowCursorLine: boolean): number[] {
+export function reflowLargerGetLinesToRemove(lines: CircularList<IBufferLine>, oldCols: number, newCols: number, bufferAbsoluteY: number, reflowCursorLine: boolean): number[] {
   // Gather all BufferLines that need to be removed from the Buffer here so that they can be
   // batched up and only committed once
   const toRemove: number[] = [];
@@ -79,13 +79,13 @@ export function reflowLargerGetLinesToRemove(lines: CircularList<IBufferLine>, o
         if (wrappedLines[destLineIndex - 1].getWidth(newCols - 1) === 2) {
           wrappedLines[destLineIndex].copyCellsFrom(wrappedLines[destLineIndex - 1], newCols - 1, destCol++, 1, false);
           // Null out the end of the last row
-          wrappedLines[destLineIndex - 1].setCell(newCols - 1, nullCell);
+          wrappedLines[destLineIndex - 1].setCellToNull(newCols - 1);
         }
       }
     }
 
     // Clear out remaining cells or fragments could remain;
-    wrappedLines[destLineIndex].replaceCells(destCol, newCols, nullCell);
+    wrappedLines[destLineIndex].replaceNullFill(destCol, newCols, DEFAULT_ATTR_DATA);
 
     // Work backwards and remove any rows at the end that only contain null cells
     let countToRemove = 0;

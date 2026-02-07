@@ -4,8 +4,9 @@
  */
 
 import { IAttributeData, IBufferLine, ICellData, IExtendedAttrs } from 'common/Types';
+import { DEFAULT_ATTR_DATA, ExtendedAttrs } from 'common/buffer/AttributeData';
 import { CellData } from 'common/buffer/CellData';
-import { Attributes, BgFlags, NULL_CELL_CHAR, NULL_CELL_WIDTH, WHITESPACE_CELL_CHAR, WHITESPACE_CELL_WIDTH } from 'common/buffer/Constants';
+import { Attributes, BgFlags, NULL_CELL_CHAR, NULL_CELL_CODE, NULL_CELL_WIDTH, TAIL_CELL_CODE, TAIL_CELL_WIDTH, WHITESPACE_CELL_CHAR, WHITESPACE_CELL_WIDTH } from 'common/buffer/Constants';
 import { stringFromCodePoint } from 'common/input/TextDecoder';
 
 /**
@@ -174,28 +175,28 @@ export class BufferLine implements IBufferLine {
     this._data[index * CELL_SIZE + Cell.BG] = cell.bg;
   }
 
+  public setCellToNull(index: number, attr: IAttributeData = DEFAULT_ATTR_DATA): void {
+    this.setCellFromCodepoint(index, NULL_CELL_CODE, NULL_CELL_WIDTH, attr);
+  }
+
+  public setCellToTail(index: number, attr: IAttributeData = DEFAULT_ATTR_DATA): void {
+    this.setCellFromCodepoint(index, TAIL_CELL_CODE, TAIL_CELL_WIDTH, attr);
+  }
+
   /**
    * Set cell data from input handler.
    * Since the input handler see the incoming chars as UTF32 codepoints,
    * it gets an optimized access method.
    */
-  public setCellFromCodepoint(index: number, codePoint: number, width: number, attrs: IAttributeData): void {
-    if (attrs.bg & BgFlags.HAS_EXTENDED) {
-      this._extendedAttrs[index] = attrs.extended;
+  public setCellFromCodepoint(index: number, codePoint: number, width: number, attr: IAttributeData): void {
+    if (attr.bg & BgFlags.HAS_EXTENDED) {
+      this._extendedAttrs[index] = attr.extended;
     } else if (this._extendedAttrs[index]) {
       delete this._extendedAttrs[index];
     }
     this._data[index * CELL_SIZE + Cell.CONTENT] = CellData.packContent(codePoint, false, width);
-    this._data[index * CELL_SIZE + Cell.FG] = attrs.fg;
-    this._data[index * CELL_SIZE + Cell.BG] = attrs.bg;
-  }
-
-  public setNullCell(index: number, attrs: IAttributeData): void {
-    this.setCellFromCodepoint(index, 0, NULL_CELL_WIDTH, attrs);
-  }
-
-  public setEmptyCell(index: number, attrs: IAttributeData): void {
-    this.setCellFromCodepoint(index, 0, 0, attrs);
+    this._data[index * CELL_SIZE + Cell.FG] = attr.fg;
+    this._data[index * CELL_SIZE + Cell.BG] = attr.bg;
   }
 
   /**
@@ -247,6 +248,11 @@ export class BufferLine implements IBufferLine {
     }
   }
 
+  public insertNullFill(pos: number, n: number, fillAttr: IAttributeData): void {
+    const fill = this.getNullCell(fillAttr);
+    this.insertCells(pos, n, fill);
+  }
+
   public deleteCells(pos: number, n: number, fillCellData: ICellData): void {
     pos %= this.length;
     if (n < this.length - pos) {
@@ -272,6 +278,11 @@ export class BufferLine implements IBufferLine {
     if (this.isTailCell(pos)) {
       this.setCellFromCodepoint(pos, 0, 1, fillCellData);
     }
+  }
+
+  public deleteNullFill(pos: number, n: number, fillAttr: IAttributeData): void {
+    const fill = this.getNullCell(fillAttr);
+    this.deleteCells(pos, n, fill);
   }
 
   public replaceCells(start: number, end: number, fillCellData: ICellData, respectProtect: boolean = false): void {
@@ -304,6 +315,11 @@ export class BufferLine implements IBufferLine {
     while (start < end  && start < this.length) {
       this.setCell(start++, fillCellData);
     }
+  }
+
+  public replaceNullFill(start: number, end: number, fillAttr: IAttributeData, respectProtect: boolean = false): void {
+    const fill = this.getNullCell(fillAttr);
+    this.replaceCells(start, end, fill, respectProtect);
   }
 
   /**
@@ -355,6 +371,11 @@ export class BufferLine implements IBufferLine {
     return uint32Cells * 4 * CLEANUP_THRESHOLD < this._data.buffer.byteLength;
   }
 
+  public resizeNullFill(cols: number, fillAttr: IAttributeData): boolean {
+    const fill = this.getNullCell(fillAttr);
+    return this.resize(cols, fill);
+  }
+
   /**
    * Cleanup underlying array buffer.
    * A cleanup will be triggered if the array buffer exceeds the actual used
@@ -387,6 +408,16 @@ export class BufferLine implements IBufferLine {
     for (let i = 0; i < this.length; ++i) {
       this.setCell(i, fillCellData);
     }
+  }
+
+  public fillToNull(fillAttr: IAttributeData, respectProtect: boolean = false): void {
+    const fill = this.getNullCell(fillAttr);
+    this.fill(fill, respectProtect);
+  }
+
+  public fillToAscii(char: string, fillAttr: IAttributeData, respectProtect: boolean = false): void {
+    const fill = this.createAsciiCell(char, fillAttr);
+    this.fill(fill, respectProtect);
   }
 
   /** alter to a full copy of line  */
@@ -524,34 +555,35 @@ export class BufferLine implements IBufferLine {
     return cell;
   }
 
-  public createNullCell(attr?: IAttributeData): ICellData {
+  public createNullCell(attr?: IAttributeData): CellData {
     const cell = this.createCell(attr);
     cell.setChars(NULL_CELL_CHAR, NULL_CELL_WIDTH);
     return cell;
   }
 
-  public createWhitespaceCell(attr?: IAttributeData): ICellData {
+  public createWhitespaceCell(attr?: IAttributeData): CellData {
     const cell = this.createCell(attr);
     cell.setChars(WHITESPACE_CELL_CHAR, WHITESPACE_CELL_WIDTH);
     return cell;
   }
 
-  public createAsciiCell(char: string, attr?: IAttributeData): ICellData {
+  public createAsciiCell(char: string, attr?: IAttributeData): CellData {
     const cell = this.createCell(attr);
     cell.setChars(char, 1);
     return cell;
   }
 
-  public snapRightVisualIndex(col: number): number {
+  public snapRightToHeadCell(col: number): number {
     if (col >= this.length) return this.length;
-    return this.hasWidth(col) ? col : col + 1;
+    return this.isHeadCell(col) ? col : col + 1;
   }
 
-  public snapLeftVisualIndex(col: number): number {
+  public snapLeftToHeadCell(col: number): number {
     if (col >= this.length) return this.length;
-    return this.hasWidth(col) ? col : col - 1;
+    return this.isHeadCell(col) ? col : col - 1;
   }
 
+  public isHeadCell(col: number):  boolean { return this.hasWidth(col); } // width!=0
   public isEmptyCell(col: number): boolean { return !this.hasContent(col); }
   public isNullCell(col: number):  boolean { return this.isEmptyCell(col) && this.hasWidth(col); } // width==1
   public isTailCell(col: number):  boolean { return this.isEmptyCell(col) && !this.hasWidth(col); } // width==0
@@ -560,6 +592,20 @@ export class BufferLine implements IBufferLine {
     let n = 0;
     for (let i = this.length - 1; i >= 0 && this.isNullCell(i); --i) ++n;
     return n;
+  }
+
+  private _nullCell = this.createNullCell();
+  public getNullCell(attr?: IAttributeData): CellData {
+    if (attr) {
+      this._nullCell.fg = attr.fg;
+      this._nullCell.bg = attr.bg;
+      this._nullCell.extended = attr.extended;
+    } else {
+      this._nullCell.fg = 0;
+      this._nullCell.bg = 0;
+      this._nullCell.extended = new ExtendedAttrs();
+    }
+    return this._nullCell;
   }
 
 }

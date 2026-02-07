@@ -17,6 +17,12 @@ const INIT_ROWS = 24;
 // grab wcwidth from mock unicode service (hardcoded to V6)
 const wcwidth = (new MockUnicodeService()).wcwidth;
 
+function setCellChar(term: TestTerminal, row: number, col: number, ch: string, width = 1, attrs = DEFAULT_ATTR_DATA): void {
+  const line = term.buffer.lines.get(row)!;
+  const cp = ch.codePointAt(0)!;
+  line.setCellFromCodepoint(col, cp, width, attrs);
+}
+
 describe('Terminal', () => {
   let term: TestTerminal;
   const termOptions = {
@@ -408,8 +414,8 @@ describe('Terminal', () => {
     describe('scroll() function', () => {
       describe('when scrollback > 0', () => {
         it('should create a new line and scroll', () => {
-          term.buffer.lines.get(0)!.setCell(0, CellData.fromCharData([0, 'a', 0, 'a'.charCodeAt(0)]));
-          term.buffer.lines.get(INIT_ROWS - 1)!.setCell(0, CellData.fromCharData([0, 'b', 0, 'b'.charCodeAt(0)]));
+          setCellChar(term, 0, 0, 'a');
+          setCellChar(term, INIT_ROWS - 1, 0, 'b');
           term.buffer.y = INIT_ROWS - 1; // Move cursor to last line
           term.scroll(DEFAULT_ATTR_DATA.clone());
           assert.equal(term.buffer.lines.length, INIT_ROWS + 1);
@@ -419,9 +425,9 @@ describe('Terminal', () => {
         });
 
         it('should properly scroll inside a scroll region (scrollTop set)', () => {
-          term.buffer.lines.get(0)!.setCell(0, CellData.fromCharData([0, 'a', 0, 'a'.charCodeAt(0)]));
-          term.buffer.lines.get(1)!.setCell(0, CellData.fromCharData([0, 'b', 0, 'b'.charCodeAt(0)]));
-          term.buffer.lines.get(2)!.setCell(0, CellData.fromCharData([0, 'c', 0, 'c'.charCodeAt(0)]));
+          setCellChar(term, 0, 0, 'a');
+          setCellChar(term, 1, 0, 'b');
+          setCellChar(term, 2, 0, 'c');
           term.buffer.y = INIT_ROWS - 1; // Move cursor to last line
           term.buffer.scrollTop = 1;
           term.scroll(DEFAULT_ATTR_DATA.clone());
@@ -431,11 +437,11 @@ describe('Terminal', () => {
         });
 
         it('should properly scroll inside a scroll region (scrollBottom set)', () => {
-          term.buffer.lines.get(0)!.setCell(0, CellData.fromCharData([0, 'a', 0, 'a'.charCodeAt(0)]));
-          term.buffer.lines.get(1)!.setCell(0, CellData.fromCharData([0, 'b', 0, 'b'.charCodeAt(0)]));
-          term.buffer.lines.get(2)!.setCell(0, CellData.fromCharData([0, 'c', 0, 'c'.charCodeAt(0)]));
-          term.buffer.lines.get(3)!.setCell(0, CellData.fromCharData([0, 'd', 0, 'd'.charCodeAt(0)]));
-          term.buffer.lines.get(4)!.setCell(0, CellData.fromCharData([0, 'e', 0, 'e'.charCodeAt(0)]));
+          setCellChar(term, 0, 0, 'a');
+          setCellChar(term, 1, 0, 'b');
+          setCellChar(term, 2, 0, 'c');
+          setCellChar(term, 3, 0, 'd');
+          setCellChar(term, 4, 0, 'e');
           term.buffer.y = 3;
           term.buffer.scrollBottom = 3;
           term.scroll(DEFAULT_ATTR_DATA.clone());
@@ -449,11 +455,11 @@ describe('Terminal', () => {
         });
 
         it('should properly scroll inside a scroll region (scrollTop and scrollBottom set)', () => {
-          term.buffer.lines.get(0)!.setCell(0, CellData.fromCharData([0, 'a', 0, 'a'.charCodeAt(0)]));
-          term.buffer.lines.get(1)!.setCell(0, CellData.fromCharData([0, 'b', 0, 'b'.charCodeAt(0)]));
-          term.buffer.lines.get(2)!.setCell(0, CellData.fromCharData([0, 'c', 0, 'c'.charCodeAt(0)]));
-          term.buffer.lines.get(3)!.setCell(0, CellData.fromCharData([0, 'd', 0, 'd'.charCodeAt(0)]));
-          term.buffer.lines.get(4)!.setCell(0, CellData.fromCharData([0, 'e', 0, 'e'.charCodeAt(0)]));
+          setCellChar(term, 0, 0, 'a');
+          setCellChar(term, 1, 0, 'b');
+          setCellChar(term, 2, 0, 'c');
+          setCellChar(term, 3, 0, 'd');
+          setCellChar(term, 4, 0, 'e');
           term.buffer.y = INIT_ROWS - 1; // Move cursor to last line
           term.buffer.scrollTop = 1;
           term.buffer.scrollBottom = 3;
@@ -474,9 +480,9 @@ describe('Terminal', () => {
         });
 
         it('should create a new line and shift everything up', () => {
-          term.buffer.lines.get(0)!.setCell(0, CellData.fromCharData([0, 'a', 0, 'a'.charCodeAt(0)]));
-          term.buffer.lines.get(1)!.setCell(0, CellData.fromCharData([0, 'b', 0, 'b'.charCodeAt(0)]));
-          term.buffer.lines.get(INIT_ROWS - 1)!.setCell(0, CellData.fromCharData([0, 'c', 0, 'c'.charCodeAt(0)]));
+          setCellChar(term, 0, 0, 'a');
+          setCellChar(term, 1, 0, 'b');
+          setCellChar(term, INIT_ROWS - 1, 0, 'c');
           term.buffer.y = INIT_ROWS - 1; // Move cursor to last line
           assert.equal(term.buffer.lines.length, INIT_ROWS);
           term.scroll(DEFAULT_ATTR_DATA.clone());
@@ -489,9 +495,9 @@ describe('Terminal', () => {
         });
 
         it('should properly scroll inside a scroll region (scrollTop set)', () => {
-          term.buffer.lines.get(0)!.setCell(0, CellData.fromCharData([0, 'a', 0, 'a'.charCodeAt(0)]));
-          term.buffer.lines.get(1)!.setCell(0, CellData.fromCharData([0, 'b', 0, 'b'.charCodeAt(0)]));
-          term.buffer.lines.get(2)!.setCell(0, CellData.fromCharData([0, 'c', 0, 'c'.charCodeAt(0)]));
+          setCellChar(term, 0, 0, 'a');
+          setCellChar(term, 1, 0, 'b');
+          setCellChar(term, 2, 0, 'c');
           term.buffer.y = INIT_ROWS - 1; // Move cursor to last line
           term.buffer.scrollTop = 1;
           term.scroll(DEFAULT_ATTR_DATA.clone());
@@ -501,11 +507,11 @@ describe('Terminal', () => {
         });
 
         it('should properly scroll inside a scroll region (scrollBottom set)', () => {
-          term.buffer.lines.get(0)!.setCell(0, CellData.fromCharData([0, 'a', 0, 'a'.charCodeAt(0)]));
-          term.buffer.lines.get(1)!.setCell(0, CellData.fromCharData([0, 'b', 0, 'b'.charCodeAt(0)]));
-          term.buffer.lines.get(2)!.setCell(0, CellData.fromCharData([0, 'c', 0, 'c'.charCodeAt(0)]));
-          term.buffer.lines.get(3)!.setCell(0, CellData.fromCharData([0, 'd', 0, 'd'.charCodeAt(0)]));
-          term.buffer.lines.get(4)!.setCell(0, CellData.fromCharData([0, 'e', 0, 'e'.charCodeAt(0)]));
+          setCellChar(term, 0, 0, 'a');
+          setCellChar(term, 1, 0, 'b');
+          setCellChar(term, 2, 0, 'c');
+          setCellChar(term, 3, 0, 'd');
+          setCellChar(term, 4, 0, 'e');
           term.buffer.y = 3;
           term.buffer.scrollBottom = 3;
           term.scroll(DEFAULT_ATTR_DATA.clone());
@@ -518,11 +524,11 @@ describe('Terminal', () => {
         });
 
         it('should properly scroll inside a scroll region (scrollTop and scrollBottom set)', () => {
-          term.buffer.lines.get(0)!.setCell(0, CellData.fromCharData([0, 'a', 0, 'a'.charCodeAt(0)]));
-          term.buffer.lines.get(1)!.setCell(0, CellData.fromCharData([0, 'b', 0, 'b'.charCodeAt(0)]));
-          term.buffer.lines.get(2)!.setCell(0, CellData.fromCharData([0, 'c', 0, 'c'.charCodeAt(0)]));
-          term.buffer.lines.get(3)!.setCell(0, CellData.fromCharData([0, 'd', 0, 'd'.charCodeAt(0)]));
-          term.buffer.lines.get(4)!.setCell(0, CellData.fromCharData([0, 'e', 0, 'e'.charCodeAt(0)]));
+          setCellChar(term, 0, 0, 'a');
+          setCellChar(term, 1, 0, 'b');
+          setCellChar(term, 2, 0, 'c');
+          setCellChar(term, 3, 0, 'd');
+          setCellChar(term, 4, 0, 'e');
           term.buffer.y = INIT_ROWS - 1; // Move cursor to last line
           term.buffer.scrollTop = 1;
           term.buffer.scrollBottom = 3;

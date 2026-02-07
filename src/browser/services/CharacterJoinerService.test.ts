@@ -24,7 +24,7 @@ describe('CharacterJoinerService', () => {
     lines.set(3, lineData([['no joined ranges']]));
     lines.set(4, new BufferLine(0));
     lines.set(5, lineData([['a', 0x11111111], [' -> b -> c -> '], ['d', 0x22222222]]));
-    const line6 = lineData([['wi']]);
+    const line6 = lineData([['wi']]) as BufferLine;
     line6.resize(line6.length + 1, CellData.fromCharData([0, '￥', 2, '￥'.charCodeAt(0)]));
     line6.resize(line6.length + 1, CellData.fromCharData([0, '', 0, 0]));
     let sub = lineData([['deemo']]);

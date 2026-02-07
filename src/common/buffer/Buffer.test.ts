@@ -22,6 +22,12 @@ function loadSnap(line: BufferLine, x: number, work = new CellData()): CellSnaps
   return [work.fg, work.getChars(), work.getWidth(), work.getCode()];
 }
 
+function setCellChar(buffer: Buffer, row: number, col: number, ch: string, width = 1, attrs = DEFAULT_ATTR_DATA): void {
+  const line = buffer.lines.get(row)!;
+  const cp = ch.codePointAt(0)!;
+  line.setCellFromCodepoint(col, cp, width, attrs);
+}
+
 describe('Buffer', () => {
   let optionsService: MockOptionsService;
   let bufferService: MockBufferService;
@@ -162,12 +168,12 @@ describe('Buffer', () => {
           assert.equal(buffer.lines.maxLength, INIT_ROWS);
           buffer.y = INIT_ROWS - 1;
           buffer.fillViewportRows();
-          let chData = loadSnap(buffer.lines.get(0) as BufferLine, 0);
-          chData[1] = 'a';
-          buffer.lines.get(5)!.setCell(0, CellData.fromCharData(chData));
-          chData = loadSnap(buffer.lines.get(INIT_ROWS - 1) as BufferLine, 0);
-          chData[1] = 'b';
-          buffer.lines.get(INIT_ROWS - 1)!.setCell(0, CellData.fromCharData(chData));
+          // let chData = loadSnap(buffer.lines.get(0) as BufferLine, 0);
+          // chData[1] = 'a';
+          setCellChar(buffer, 5, 0, 'a');
+          // chData = loadSnap(buffer.lines.get(INIT_ROWS - 1) as BufferLine, 0);
+          // chData[1] = 'b';
+          setCellChar(buffer, INIT_ROWS - 1, 0, 'b');
           buffer.resize(INIT_COLS, INIT_ROWS - 5);
           assert.equal(loadSnap(buffer.lines.get(0) as BufferLine, 0)[1], 'a');
           assert.equal(loadSnap(buffer.lines.get(INIT_ROWS - 1 - 5) as BufferLine, 0)[1], 'b');
@@ -268,9 +274,7 @@ describe('Buffer', () => {
         buffer.resize(5, 10);
         const firstLine = buffer.lines.get(0)!;
         for (let i = 0; i < 5; i++) {
-          const code = 'a'.charCodeAt(0) + i;
-          const char = String.fromCharCode(code);
-          firstLine.setCell(i, CellData.fromCharData([0, char, 1, code]));
+          setCellChar(buffer, 0, i, String.fromCharCode('a'.charCodeAt(0) + i));
         }
         buffer.y = 1;
         assert.equal(buffer.lines.get(0)!.length, 5);
@@ -306,9 +310,7 @@ describe('Buffer', () => {
         buffer.resize(10, 5);
         const lastLine = buffer.lines.get(3)!;
         for (let i = 0; i < 10; i++) {
-          const code = 'a'.charCodeAt(0) + i;
-          const char = String.fromCharCode(code);
-          lastLine.setCell(i, CellData.fromCharData([0, char, 1]));
+          setCellChar(buffer, 3, i, String.fromCharCode('a'.charCodeAt(0) + i));
         }
         assert.equal(buffer.lines.length, 5);
         buffer.y = 4;
@@ -351,14 +353,10 @@ describe('Buffer', () => {
         const firstLine = buffer.lines.get(0)!;
         const secondLine = buffer.lines.get(1)!;
         for (let i = 0; i < 10; i++) {
-          const code = 'a'.charCodeAt(0) + i;
-          const char = String.fromCharCode(code);
-          firstLine.setCell(i, CellData.fromCharData([0, char, 1]));
+          setCellChar(buffer, 0, i, String.fromCharCode('a'.charCodeAt(0) + i));
         }
         for (let i = 0; i < 10; i++) {
-          const code = '0'.charCodeAt(0) + i;
-          const char = String.fromCharCode(code);
-          secondLine.setCell(i, CellData.fromCharData([0, char, 1]));
+          setCellChar(buffer, 1, i, String.fromCharCode('0'.charCodeAt(0) + i));
         }
         assert.equal(buffer.lines.length, 10);
         assert.equal(buffer.lines.get(0)!.translateToString(), 'abcdefghij');
@@ -393,11 +391,10 @@ describe('Buffer', () => {
         buffer.fillViewportRows();
         buffer.resize(4, 3);
         buffer.y = 2;
-        const firstLine = buffer.lines.get(0)!;
-        firstLine.setCell(0, CellData.fromCharData([ 0, 'a', 1]));
-        firstLine.setCell(1, CellData.fromCharData([ 0, 'b', 1]));
-        firstLine.setCell(2, CellData.fromCharData([ 0, 'c', 1]));
-        firstLine.setCell(3, CellData.fromCharData([ 0, '😁', 1]));
+        setCellChar(buffer, 0, 0, 'a');
+        setCellChar(buffer, 0, 1, 'b');
+        setCellChar(buffer, 0, 2, 'c');
+        setCellChar(buffer, 0, 3, '😁');
         assert.equal(buffer.lines.length, 3);
         assert.equal(buffer.lines.get(0)!.translateToString(), 'abc😁');
         assert.equal(buffer.lines.get(1)!.translateToString(), '    ');
@@ -409,19 +406,13 @@ describe('Buffer', () => {
         buffer.fillViewportRows();
         buffer.resize(10, 16);
         for (let i = 0; i < 10; i++) {
-          const code = 'a'.charCodeAt(0) + i;
-          const char = String.fromCharCode(code);
-          buffer.lines.get(0)!.setCell(i, CellData.fromCharData([0, char, 1]));
+          setCellChar(buffer, 0, i, String.fromCharCode('a'.charCodeAt(0) + i));
         }
         for (let i = 0; i < 10; i++) {
-          const code = '0'.charCodeAt(0) + i;
-          const char = String.fromCharCode(code);
-          buffer.lines.get(1)!.setCell(i, CellData.fromCharData([0, char, 1]));
+          setCellChar(buffer, 1, i, String.fromCharCode('0'.charCodeAt(0) + i));
         }
         for (let i = 0; i < 10; i++) {
-          const code = 'k'.charCodeAt(0) + i;
-          const char = String.fromCharCode(code);
-          buffer.lines.get(2)!.setCell(i, CellData.fromCharData([0, char, 1, code]));
+          setCellChar(buffer, 2, i, String.fromCharCode('k'.charCodeAt(0) + i));
         }
         buffer.y = 3;
         // Buffer:
@@ -472,19 +463,13 @@ describe('Buffer', () => {
         optionsService.options.scrollback = 1;
         buffer.resize(10, 11);
         for (let i = 0; i < 10; i++) {
-          const code = 'a'.charCodeAt(0) + i;
-          const char = String.fromCharCode(code);
-          buffer.lines.get(0)!.setCell(i, CellData.fromCharData([0, char, 1, code]));
+          setCellChar(buffer, 0, i, String.fromCharCode('a'.charCodeAt(0) + i));
         }
         for (let i = 0; i < 10; i++) {
-          const code = '0'.charCodeAt(0) + i;
-          const char = String.fromCharCode(code);
-          buffer.lines.get(1)!.setCell(i, CellData.fromCharData([0, char, 1, code]));
+          setCellChar(buffer, 1, i, String.fromCharCode('0'.charCodeAt(0) + i));
         }
         for (let i = 0; i < 10; i++) {
-          const code = 'k'.charCodeAt(0) + i;
-          const char = String.fromCharCode(code);
-          buffer.lines.get(2)!.setCell(i, CellData.fromCharData([0, char, 1, code]));
+          setCellChar(buffer, 2, i, String.fromCharCode('k'.charCodeAt(0) + i));
         }
         buffer.y = 10;
         // Buffer:
@@ -529,10 +514,10 @@ describe('Buffer', () => {
         buffer.fillViewportRows();
         buffer.resize(4, 10);
         buffer.y = 2;
-        buffer.lines.get(0)!.setCell(0, CellData.fromCharData([0, 'a', 1]));
-        buffer.lines.get(0)!.setCell(1, CellData.fromCharData([0, 'b', 1]));
-        buffer.lines.get(1)!.setCell(0, CellData.fromCharData([0, 'c', 1]));
-        buffer.lines.get(1)!.setCell(1, CellData.fromCharData([0, 'd', 1]));
+        setCellChar(buffer, 0, 0, 'a');
+        setCellChar(buffer, 0, 1, 'b');
+        setCellChar(buffer, 1, 0, 'c');
+        setCellChar(buffer, 1, 1, 'd');
         buffer.lines.get(1)!.isWrapped = true;
         // Buffer:
         // "ab  " (wrapped)
@@ -553,16 +538,16 @@ describe('Buffer', () => {
         buffer.resize(12, 10);
         buffer.y = 2;
         for (let i = 0; i < 12; i += 4) {
-          buffer.lines.get(0)!.setCell(i, CellData.fromCharData([0, '汉', 2]));
-          buffer.lines.get(1)!.setCell(i, CellData.fromCharData([0, '汉', 2]));
+          setCellChar(buffer, 0, i, '汉', 2);
+          setCellChar(buffer, 1, i, '汉', 2);
         }
         for (let i = 2; i < 12; i += 4) {
-          buffer.lines.get(0)!.setCell(i, CellData.fromCharData([0, '语', 2]));
-          buffer.lines.get(1)!.setCell(i, CellData.fromCharData([0, '语', 2]));
+          setCellChar(buffer, 0, i, '语', 2);
+          setCellChar(buffer, 1, i, '语', 2);
         }
         for (let i = 1; i < 12; i += 2) {
-          buffer.lines.get(0)!.setCell(i, CellData.fromCharData([0, '', 0]));
-          buffer.lines.get(1)!.setCell(i, CellData.fromCharData([0, '', 0]));
+          setCellChar(buffer, 0, i, '', 0);
+          setCellChar(buffer, 1, i, '', 0);
         }
         buffer.lines.get(1)!.isWrapped = true;
         // Buffer:
@@ -587,10 +572,10 @@ describe('Buffer', () => {
         buffer.fillViewportRows();
         buffer.resize(4, 10);
         buffer.y = 2;
-        buffer.lines.get(0)!.setCell(0, CellData.fromCharData([0, 'a', 1]));
-        buffer.lines.get(0)!.setCell(1, CellData.fromCharData([0, 'b', 1]));
-        buffer.lines.get(1)!.setCell(0, CellData.fromCharData([0, 'c', 1]));
-        buffer.lines.get(1)!.setCell(1, CellData.fromCharData([0, 'd', 1]));
+        setCellChar(buffer, 0, 0, 'a');
+        setCellChar(buffer, 0, 1, 'b');
+        setCellChar(buffer, 1, 0, 'c');
+        setCellChar(buffer, 1, 1, 'd');
         buffer.lines.get(1)!.isWrapped = true;
         // Buffer:
         // "ab  " (wrapped)
@@ -614,16 +599,16 @@ describe('Buffer', () => {
         buffer.resize(12, 10);
         buffer.y = 2;
         for (let i = 0; i < 12; i += 4) {
-          buffer.lines.get(0)!.setCell(i, CellData.fromCharData([0, '汉', 2]));
-          buffer.lines.get(1)!.setCell(i, CellData.fromCharData([0, '汉', 2]));
+          setCellChar(buffer, 0, i, '汉', 2);
+          setCellChar(buffer, 1, i, '汉', 2);
         }
         for (let i = 2; i < 12; i += 4) {
-          buffer.lines.get(0)!.setCell(i, CellData.fromCharData([0, '语', 2]));
-          buffer.lines.get(1)!.setCell(i, CellData.fromCharData([0, '语', 2]));
+          setCellChar(buffer, 0, i, '语', 2);
+          setCellChar(buffer, 1, i, '语', 2);
         }
         for (let i = 1; i < 12; i += 2) {
-          buffer.lines.get(0)!.setCell(i, CellData.fromCharData([0, '', 0]));
-          buffer.lines.get(1)!.setCell(i, CellData.fromCharData([0, '', 0]));
+          setCellChar(buffer, 0, i, '', 0);
+          setCellChar(buffer, 1, i, '', 0);
         }
         buffer.lines.get(1)!.isWrapped = true;
         // Buffer:
@@ -676,20 +661,20 @@ describe('Buffer', () => {
           // '  '
           buffer.fillViewportRows();
           buffer.resize(2, 10);
-          buffer.lines.get(0)!.setCell(0, CellData.fromCharData([0, 'a', 1]));
-          buffer.lines.get(0)!.setCell(1, CellData.fromCharData([0, 'b', 1]));
-          buffer.lines.get(1)!.setCell(0, CellData.fromCharData([0, 'c', 1]));
-          buffer.lines.get(1)!.setCell(1, CellData.fromCharData([0, 'd', 1]));
+          setCellChar(buffer, 0, 0, 'a');
+          setCellChar(buffer, 0, 1, 'b');
+          setCellChar(buffer, 1, 0, 'c');
+          setCellChar(buffer, 1, 1, 'd');
           buffer.lines.get(1)!.isWrapped = true;
-          buffer.lines.get(2)!.setCell(0, CellData.fromCharData([0, 'e', 1]));
-          buffer.lines.get(2)!.setCell(1, CellData.fromCharData([0, 'f', 1]));
-          buffer.lines.get(3)!.setCell(0, CellData.fromCharData([0, 'g', 1]));
-          buffer.lines.get(3)!.setCell(1, CellData.fromCharData([0, 'h', 1]));
+          setCellChar(buffer, 2, 0, 'e');
+          setCellChar(buffer, 2, 1, 'f');
+          setCellChar(buffer, 3, 0, 'g');
+          setCellChar(buffer, 3, 1, 'h');
           buffer.lines.get(3)!.isWrapped = true;
-          buffer.lines.get(4)!.setCell(0, CellData.fromCharData([0, 'i', 1]));
-          buffer.lines.get(4)!.setCell(1, CellData.fromCharData([0, 'j', 1]));
-          buffer.lines.get(5)!.setCell(0, CellData.fromCharData([0, 'k', 1]));
-          buffer.lines.get(5)!.setCell(1, CellData.fromCharData([0, 'l', 1]));
+          setCellChar(buffer, 4, 0, 'i');
+          setCellChar(buffer, 4, 1, 'j');
+          setCellChar(buffer, 5, 0, 'k');
+          setCellChar(buffer, 5, 1, 'l');
           buffer.lines.get(5)!.isWrapped = true;
         });
         describe('viewport not yet filled', () => {
@@ -867,18 +852,18 @@ describe('Buffer', () => {
           // '    '
           buffer.fillViewportRows();
           buffer.resize(4, 10);
-          buffer.lines.get(0)!.setCell(0, CellData.fromCharData([0, 'a', 1]));
-          buffer.lines.get(0)!.setCell(1, CellData.fromCharData([0, 'b', 1]));
-          buffer.lines.get(0)!.setCell(2, CellData.fromCharData([0, 'c', 1]));
-          buffer.lines.get(0)!.setCell(3, CellData.fromCharData([0, 'd', 1]));
-          buffer.lines.get(1)!.setCell(0, CellData.fromCharData([0, 'e', 1]));
-          buffer.lines.get(1)!.setCell(1, CellData.fromCharData([0, 'f', 1]));
-          buffer.lines.get(1)!.setCell(2, CellData.fromCharData([0, 'g', 1]));
-          buffer.lines.get(1)!.setCell(3, CellData.fromCharData([0, 'h', 1]));
-          buffer.lines.get(2)!.setCell(0, CellData.fromCharData([0, 'i', 1]));
-          buffer.lines.get(2)!.setCell(1, CellData.fromCharData([0, 'j', 1]));
-          buffer.lines.get(2)!.setCell(2, CellData.fromCharData([0, 'k', 1]));
-          buffer.lines.get(2)!.setCell(3, CellData.fromCharData([0, 'l', 1]));
+          setCellChar(buffer, 0, 0, 'a');
+          setCellChar(buffer, 0, 1, 'b');
+          setCellChar(buffer, 0, 2, 'c');
+          setCellChar(buffer, 0, 3, 'd');
+          setCellChar(buffer, 1, 0, 'e');
+          setCellChar(buffer, 1, 1, 'f');
+          setCellChar(buffer, 1, 2, 'g');
+          setCellChar(buffer, 1, 3, 'h');
+          setCellChar(buffer, 2, 0, 'i');
+          setCellChar(buffer, 2, 1, 'j');
+          setCellChar(buffer, 2, 2, 'k');
+          setCellChar(buffer, 2, 3, 'l');
         });
         describe('viewport not yet filled', () => {
           it('should move the cursor down', () => {

@@ -21,7 +21,7 @@ const dom = new jsdom.JSDOM('');
 describe('DomRendererRowFactory', () => {
   let dom: jsdom.JSDOM;
   let rowFactory: DomRendererRowFactory;
-  let lineData: IBufferLine;
+  let lineData: BufferLine;
   let widthCache: TestWidthCache;
 
   beforeEach(() => {
@@ -501,7 +501,7 @@ describe('DomRendererRowFactory', () => {
     return element.innerHTML;
   }
 
-  function createEmptyLineData(cols: number): IBufferLine {
+  function createEmptyLineData(cols: number): BufferLine {
     const lineData = new BufferLine(cols);
     for (let i = 0; i < cols; i++) {
       lineData.setCell(i, CellData.fromCharData([DEFAULT_ATTR, NULL_CELL_CHAR, NULL_CELL_WIDTH, NULL_CELL_CODE]));

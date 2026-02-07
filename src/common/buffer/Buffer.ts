@@ -44,7 +44,6 @@ export class Buffer implements IBuffer {
   private _lineCtor!: new (cols: number, fill?: ICellData, isWrapped?: boolean) => IBufferLine;
   private _dummyLine!: IBufferLine;
   private _nullCell!: ICellData;
-  private _whitespaceCell!: ICellData;
   private _cols: number;
   private _rows: number;
   private _isClearing: boolean = false;
@@ -67,7 +66,6 @@ export class Buffer implements IBuffer {
     this._lineCtor = lineCtor;
     this._dummyLine = new this._lineCtor(this._cols);
     this._nullCell = this._dummyLine.createNullCell();
-    this._whitespaceCell = this._dummyLine.createWhitespaceCell();
   }
 
   public getNullCell(attr?: IAttributeData): ICellData {
@@ -81,19 +79,6 @@ export class Buffer implements IBuffer {
       this._nullCell.extended = new ExtendedAttrs();
     }
     return this._nullCell;
-  }
-
-  public getWhitespaceCell(attr?: IAttributeData): ICellData {
-    if (attr) {
-      this._whitespaceCell.fg = attr.fg;
-      this._whitespaceCell.bg = attr.bg;
-      this._whitespaceCell.extended = attr.extended;
-    } else {
-      this._whitespaceCell.fg = 0;
-      this._whitespaceCell.bg = 0;
-      this._whitespaceCell.extended = new ExtendedAttrs();
-    }
-    return this._whitespaceCell;
   }
 
   public createCell(): ICellData {
@@ -188,7 +173,7 @@ export class Buffer implements IBuffer {
       if (this._cols < newCols) {
         for (let i = 0; i < this.lines.length; i++) {
           // +boolean for fast 0 or 1 conversion
-          dirtyMemoryLines += +this.lines.get(i)!.resize(newCols, nullCell);
+          dirtyMemoryLines += +this.lines.get(i)!.resizeNullFill(newCols, DEFAULT_ATTR_DATA);
         }
       }
 
@@ -268,7 +253,7 @@ export class Buffer implements IBuffer {
       if (this._cols > newCols) {
         for (let i = 0; i < this.lines.length; i++) {
           // +boolean for fast 0 or 1 conversion
-          dirtyMemoryLines += +this.lines.get(i)!.resize(newCols, nullCell);
+          dirtyMemoryLines += +this.lines.get(i)!.resizeNullFill(newCols, DEFAULT_ATTR_DATA);
         }
       }
     }
@@ -339,7 +324,7 @@ export class Buffer implements IBuffer {
 
   private _reflowLarger(newCols: number, newRows: number): void {
     const reflowCursorLine = this._optionsService.rawOptions.reflowCursorLine;
-    const toRemove: number[] = reflowLargerGetLinesToRemove(this.lines, this._cols, newCols, this.ybase + this.y, this.getNullCell(DEFAULT_ATTR_DATA), reflowCursorLine);
+    const toRemove: number[] = reflowLargerGetLinesToRemove(this.lines, this._cols, newCols, this.ybase + this.y, reflowCursorLine);
     if (toRemove.length > 0) {
       const newLayoutResult = reflowLargerCreateNewLayout(this.lines, toRemove);
       reflowLargerApplyNewLayout(this.lines, newLayoutResult.layout);
@@ -372,7 +357,6 @@ export class Buffer implements IBuffer {
 
   private _reflowSmaller(newCols: number, newRows: number): void {
     const reflowCursorLine = this._optionsService.rawOptions.reflowCursorLine;
-    const nullCell = this.getNullCell(DEFAULT_ATTR_DATA);
     // Gather all BufferLines that need to be inserted into the Buffer here so that they can be
     // batched up and only committed once
     const toInsert = [];
@@ -462,7 +446,7 @@ export class Buffer implements IBuffer {
       // Null out the end of the line ends if a wide character wrapped to the following line
       for (let i = 0; i < wrappedLines.length; i++) {
         if (destLineLengths[i] < newCols) {
-          wrappedLines[i].setCell(destLineLengths[i], nullCell);
+          wrappedLines[i].setCellToNull(destLineLengths[i]);
         }
       }
 

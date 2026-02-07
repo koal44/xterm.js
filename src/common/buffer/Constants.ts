@@ -17,6 +17,14 @@ export const NULL_CELL_WIDTH = 1;
 export const NULL_CELL_CODE = 0;
 
 /**
+ * Tail cell - placeholder following a wide character.
+ * It has no width (width=0) and therefore does not occupy a column.
+ * Code is 0 just like NULL_CELL_*; width distinguishes tail vs null.
+ */
+export const TAIL_CELL_WIDTH = 0;
+export const TAIL_CELL_CODE = 0;
+
+/**
  * Whitespace cell.
  * This is meant as a replacement for empty cells when needed
  * during rendering lines to preserve correct aligment.

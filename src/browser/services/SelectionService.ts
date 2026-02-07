@@ -562,7 +562,7 @@ export class SelectionService extends Disposable implements ISelectionService {
 
     // If the mouse is over the second half of a wide character, adjust the
     // selection to cover the whole character
-    this._model.selectionStart[0] = line.snapRightVisualIndex(this._model.selectionStart[0]);
+    this._model.selectionStart[0] = line.snapRightToHeadCell(this._model.selectionStart[0]);
   }
 
   /**
@@ -656,7 +656,7 @@ export class SelectionService extends Disposable implements ISelectionService {
     if (this._model.selectionEnd[1] < buffer.lines.length) {
       const line = buffer.lines.get(this._model.selectionEnd[1]);
       if (line) {
-        this._model.selectionEnd[0] = line.snapRightVisualIndex(this._model.selectionEnd[0]);
+        this._model.selectionEnd[0] = line.snapRightToHeadCell(this._model.selectionEnd[0]);
       }
     }
 

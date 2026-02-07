@@ -4,7 +4,7 @@
  * @license MIT
  */
 
-import { IInputHandler, IAttributeData, IDisposable, IWindowOptions, IColorEvent, IParseStack, ColorIndex, ColorRequestType, SpecialColorIndex, ICellData } from 'common/Types';
+import { IInputHandler, IAttributeData, IDisposable, IWindowOptions, IColorEvent, IParseStack, ColorIndex, ColorRequestType, SpecialColorIndex } from 'common/Types';
 import { C0, C1 } from 'common/data/EscapeSequences';
 import { CHARSETS, DEFAULT_CHARSET } from 'common/data/Charsets';
 import { EscapeSequenceParser } from 'common/parser/EscapeSequenceParser';
@@ -537,7 +537,7 @@ export class InputHandler extends Disposable implements IInputHandler {
 
     // handle wide chars: reset start_cell-1 if we would overwrite the second cell of a wide char
     if (this._activeBuffer.x && end - start > 0 && bufferRow.getWidth(this._activeBuffer.x - 1) === 2) {
-      bufferRow.setNullCell(this._activeBuffer.x - 1, curAttr);
+      bufferRow.setCellToNull(this._activeBuffer.x - 1, curAttr);
     }
 
     let precedingJoinState = this._parser.precedingJoinState;
@@ -607,7 +607,7 @@ export class InputHandler extends Disposable implements IInputHandler {
           }
           // clear left over cells to the right
           while (oldCol < cols) {
-            oldRow.setNullCell(oldCol++, curAttr);
+            oldRow.setCellToNull(oldCol++, curAttr);
           }
         } else {
           this._activeBuffer.x = cols - 1;
@@ -630,7 +630,7 @@ export class InputHandler extends Disposable implements IInputHandler {
         // since an empty cell is only set by fullwidth chars
         bufferRow.addCodepointToCell(this._activeBuffer.x - offset, code, chWidth);
         for (let delta = chWidth - oldWidth; --delta >= 0;) {
-          bufferRow.setEmptyCell(this._activeBuffer.x++, curAttr);
+          bufferRow.setCellToTail(this._activeBuffer.x++, curAttr);
         }
         continue;
       }
@@ -638,12 +638,12 @@ export class InputHandler extends Disposable implements IInputHandler {
       // insert mode: move characters to right
       if (insertMode) {
         // right shift cells according to the width
-        bufferRow.insertCells(this._activeBuffer.x, chWidth - oldWidth, this._activeBuffer.getNullCell(curAttr));
+        bufferRow.insertNullFill(this._activeBuffer.x, chWidth - oldWidth, curAttr);
         // test last cell - since the last cell has only room for
         // a halfwidth char any fullwidth shifted there is lost
         // and will be set to empty cell
         if (bufferRow.getWidth(cols - 1) === 2) {
-          bufferRow.setNullCell(cols - 1, curAttr);
+          bufferRow.setCellToNull(cols - 1, curAttr);
         }
       }
 
@@ -656,7 +656,7 @@ export class InputHandler extends Disposable implements IInputHandler {
       if (chWidth > 0) {
         while (--chWidth) {
           // other than a regular empty cell a cell following a wide char has no width
-          bufferRow.setEmptyCell(this._activeBuffer.x++, curAttr);
+          bufferRow.setCellToTail(this._activeBuffer.x++, curAttr);
         }
       }
     }
@@ -665,7 +665,7 @@ export class InputHandler extends Disposable implements IInputHandler {
 
     // handle wide chars: reset cell to the right if it is second cell of a wide char
     if (this._activeBuffer.x < cols && end - start > 0 && bufferRow.getWidth(this._activeBuffer.x) === 0 && !bufferRow.hasContent(this._activeBuffer.x)) {
-      bufferRow.setNullCell(this._activeBuffer.x, curAttr);
+      bufferRow.setCellToNull(this._activeBuffer.x, curAttr);
     }
 
     this._dirtyRowTracker.markDirty(this._activeBuffer.y);
@@ -1169,12 +1169,7 @@ export class InputHandler extends Disposable implements IInputHandler {
     if (!line) {
       return;
     }
-    line.replaceCells(
-      start,
-      end,
-      this._activeBuffer.getNullCell(this._eraseAttrData()),
-      respectProtect
-    );
+    line.replaceNullFill(start, end, this._eraseAttrData(), respectProtect);
     if (clearWrap) {
       line.isWrapped = false;
     }
@@ -1188,7 +1183,7 @@ export class InputHandler extends Disposable implements IInputHandler {
   private _resetBufferLine(y: number, respectProtect: boolean = false): void {
     const line = this._activeBuffer.lines.get(this._activeBuffer.ybase + y);
     if (line) {
-      line.fill(this._activeBuffer.getNullCell(this._eraseAttrData()), respectProtect);
+      line.fillToNull(this._eraseAttrData(), respectProtect);
       this._bufferService.buffer.clearMarkers(this._activeBuffer.ybase + y);
       line.isWrapped = false;
     }
@@ -1408,11 +1403,7 @@ export class InputHandler extends Disposable implements IInputHandler {
     this._restrictCursor();
     const line = this._activeBuffer.lines.get(this._activeBuffer.ybase + this._activeBuffer.y);
     if (line) {
-      line.insertCells(
-        this._activeBuffer.x,
-        params.params[0] || 1,
-        this._activeBuffer.getNullCell(this._eraseAttrData())
-      );
+      line.insertNullFill(this._activeBuffer.x, params.params[0] || 1, this._eraseAttrData());
       this._dirtyRowTracker.markDirty(this._activeBuffer.y);
     }
     return true;
@@ -1434,11 +1425,7 @@ export class InputHandler extends Disposable implements IInputHandler {
     this._restrictCursor();
     const line = this._activeBuffer.lines.get(this._activeBuffer.ybase + this._activeBuffer.y);
     if (line) {
-      line.deleteCells(
-        this._activeBuffer.x,
-        params.params[0] || 1,
-        this._activeBuffer.getNullCell(this._eraseAttrData())
-      );
+      line.deleteNullFill(this._activeBuffer.x, params.params[0] || 1, this._eraseAttrData());
       this._dirtyRowTracker.markDirty(this._activeBuffer.y);
     }
     return true;
@@ -1504,7 +1491,7 @@ export class InputHandler extends Disposable implements IInputHandler {
     const param = params.params[0] || 1;
     for (let y = this._activeBuffer.scrollTop; y <= this._activeBuffer.scrollBottom; ++y) {
       const line = this._activeBuffer.lines.get(this._activeBuffer.ybase + y)!;
-      line.deleteCells(0, param, this._activeBuffer.getNullCell(this._eraseAttrData()));
+      line.deleteNullFill(0, param, this._eraseAttrData());
       line.isWrapped = false;
     }
     this._dirtyRowTracker.markRangeDirty(this._activeBuffer.scrollTop, this._activeBuffer.scrollBottom);
@@ -1537,7 +1524,7 @@ export class InputHandler extends Disposable implements IInputHandler {
     const param = params.params[0] || 1;
     for (let y = this._activeBuffer.scrollTop; y <= this._activeBuffer.scrollBottom; ++y) {
       const line = this._activeBuffer.lines.get(this._activeBuffer.ybase + y)!;
-      line.insertCells(0, param, this._activeBuffer.getNullCell(this._eraseAttrData()));
+      line.insertNullFill(0, param, this._eraseAttrData());
       line.isWrapped = false;
     }
     this._dirtyRowTracker.markRangeDirty(this._activeBuffer.scrollTop, this._activeBuffer.scrollBottom);
@@ -1560,7 +1547,7 @@ export class InputHandler extends Disposable implements IInputHandler {
     const param = params.params[0] || 1;
     for (let y = this._activeBuffer.scrollTop; y <= this._activeBuffer.scrollBottom; ++y) {
       const line = this._activeBuffer.lines.get(this._activeBuffer.ybase + y)!;
-      line.insertCells(this._activeBuffer.x, param, this._activeBuffer.getNullCell(this._eraseAttrData()));
+      line.insertNullFill(this._activeBuffer.x, param, this._eraseAttrData());
       line.isWrapped = false;
     }
     this._dirtyRowTracker.markRangeDirty(this._activeBuffer.scrollTop, this._activeBuffer.scrollBottom);
@@ -1583,7 +1570,7 @@ export class InputHandler extends Disposable implements IInputHandler {
     const param = params.params[0] || 1;
     for (let y = this._activeBuffer.scrollTop; y <= this._activeBuffer.scrollBottom; ++y) {
       const line = this._activeBuffer.lines.get(this._activeBuffer.ybase + y)!;
-      line.deleteCells(this._activeBuffer.x, param, this._activeBuffer.getNullCell(this._eraseAttrData()));
+      line.deleteNullFill(this._activeBuffer.x, param, this._eraseAttrData());
       line.isWrapped = false;
     }
     this._dirtyRowTracker.markRangeDirty(this._activeBuffer.scrollTop, this._activeBuffer.scrollBottom);
@@ -1602,10 +1589,10 @@ export class InputHandler extends Disposable implements IInputHandler {
     this._restrictCursor();
     const line = this._activeBuffer.lines.get(this._activeBuffer.ybase + this._activeBuffer.y);
     if (line) {
-      line.replaceCells(
+      line.replaceNullFill(
         this._activeBuffer.x,
         this._activeBuffer.x + (params.params[0] || 1),
-        this._activeBuffer.getNullCell(this._eraseAttrData())
+        this._eraseAttrData()
       );
       this._dirtyRowTracker.markDirty(this._activeBuffer.y);
     }
@@ -3449,16 +3436,13 @@ export class InputHandler extends Disposable implements IInputHandler {
    * @vt: #Y   ESC   DECALN   "Screen Alignment Pattern"  "ESC # 8"  "Fill viewport with a test pattern (E)."
    */
   public screenAlignmentPattern(): boolean {
-    let cell: ICellData | undefined;
-
     this._setCursor(0, 0);
     for (let yOffset = 0; yOffset < this._bufferService.rows; ++yOffset) {
       const row = this._activeBuffer.ybase + this._activeBuffer.y + yOffset;
       const line = this._activeBuffer.lines.get(row);
       if (!line) continue;
 
-      cell ??= line.createAsciiCell('E', this._curAttrData);
-      line.fill(cell);
+      line.fillToAscii('E', this._curAttrData);
       line.isWrapped = false;
     }
     this._dirtyRowTracker.markAllDirty();
