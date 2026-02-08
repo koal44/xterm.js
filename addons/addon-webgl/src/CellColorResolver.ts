@@ -3,10 +3,10 @@ import { ICoreBrowserService, IThemeService } from 'browser/services/Services';
 import { ReadonlyColorSet } from 'browser/Types';
 import { Attributes, BgFlags, ExtFlags, FgFlags, NULL_CELL_CODE, UnderlineStyle } from 'common/buffer/Constants';
 import { IDecorationService, IOptionsService } from 'common/services/Services';
-import { ICellData } from 'common/Types';
 import { Terminal } from '@xterm/xterm';
 import { rgba } from 'common/Color';
 import { treatGlyphAsBackgroundColor } from 'browser/renderer/shared/RendererUtils';
+import { RenderCell } from 'common/buffer/RenderCell';
 
 // Work variables to avoid garbage collection
 let $fg = 0;
@@ -42,7 +42,7 @@ export class CellColorResolver {
    * Resolves colors for the cell, putting the result into the shared {@link result}. This resolves
    * overrides, inverse and selection for the cell which can then be used to feed into the renderer.
    */
-  public resolve(cell: ICellData, x: number, y: number, deviceCellWidth: number): void {
+  public resolve(cell: RenderCell, x: number, y: number, deviceCellWidth: number): void {
     this.result.bg = cell.bg;
     this.result.fg = cell.fg;
     this.result.ext = cell.bg & BgFlags.HAS_EXTENDED ? cell.extended.ext : 0;
@@ -58,7 +58,7 @@ export class CellColorResolver {
     $colors = this._themeService.colors;
     $variantOffset = 0;
 
-    const code = cell.getCode();
+    const code = cell.code;
     if (code !== NULL_CELL_CODE && cell.extended.underlineStyle === UnderlineStyle.DOTTED) {
       const lineWidth = Math.max(1, Math.floor(this._optionService.rawOptions.fontSize * this._coreBrowserService.dpr / 15));
       $variantOffset = x * deviceCellWidth % (Math.round(lineWidth) * 2);
@@ -127,7 +127,7 @@ export class CellColorResolver {
       }
 
       // Overwrite fg as bg if it's a special decorative glyph (eg. powerline)
-      if (treatGlyphAsBackgroundColor(cell.getCode())) {
+      if (treatGlyphAsBackgroundColor(cell.code)) {
         // Inverse default background should be treated as transparent
         if (
           (this.result.fg & FgFlags.INVERSE) &&

@@ -3,17 +3,17 @@
  * @license MIT
  */
 
-import { IBufferLine, ICellData, IColor } from 'common/Types';
+import { IBufferLine, IColor } from 'common/Types';
 import { INVERTED_DEFAULT_COLOR } from 'browser/renderer/shared/Constants';
 import { WHITESPACE_CELL_CHAR, Attributes } from 'common/buffer/Constants';
 import { ICoreService, IDecorationService, IOptionsService } from 'common/services/Services';
 import { channels, color } from 'common/Color';
 import { ICharacterJoinerService, ICoreBrowserService, IThemeService } from 'browser/services/Services';
-import { JoinedCellData } from 'browser/services/CharacterJoinerService';
 import { treatGlyphAsBackgroundColor } from 'browser/renderer/shared/RendererUtils';
 import { AttributeData } from 'common/buffer/AttributeData';
 import { WidthCache } from 'browser/renderer/dom/WidthCache';
 import { IColorContrastCache } from 'browser/Types';
+import { RenderCell } from 'common/buffer/RenderCell';
 
 
 export const enum RowCss {
@@ -93,19 +93,16 @@ export class DomRendererRowFactory {
     const classes: string[] = [];
 
     const hasHover = linkStart !== -1 && linkEnd !== -1;
-    const workCell = lineData.createCell();
+    const cell = new RenderCell();
 
     for (let x = 0; x < lineLength; x++) {
-      lineData.loadCell(x, workCell);
-      let width = workCell.getWidth();
+      lineData.loadRenderCell(x, cell);
+      let width = cell.width;
 
       // The character to the left is a wide character, drawing is owned by the char at x-1
       if (width === 0) {
         continue;
       }
-
-      // If true, indicates that the current character(s) to draw were joined.
-      let isJoined = false;
 
       // Indicates whether this cell is part of a joined range that should be ignored as it cannot
       // be rendered entirely, like the selection state differs across the range.
@@ -116,7 +113,6 @@ export class DomRendererRowFactory {
       // Process any joined character ranges as needed. Because of how the
       // ranges are produced, we know that they are valid for the characters
       // and attributes of our input.
-      let cell = workCell;
       if (joinedRanges.length > 0 && x === joinedRanges[0][0] && isValidJoinRange) {
         const range = joinedRanges.shift()!;
         // If the ligature's selection state is not consistent, don't join it. This helps the
@@ -130,21 +126,20 @@ export class DomRendererRowFactory {
         if (!isValidJoinRange) {
           skipJoinedCheckUntilX = range[1];
         } else {
-          isJoined = true;
+          cell.isJoined = true;
 
           // We already know the exact start and end column of the joined range,
           // so we get the string and width representing it directly
-          cell = new JoinedCellData(
-            workCell,
-            lineData.translateToString(true, range[0], range[1]),
-            range[1] - range[0]
-          );
+          cell.chars = lineData.translateToString(true, range[0], range[1]);
+          cell.width = range[1] - range[0];
+          cell.visWidth = cell.width;
+          cell.code = 0x1fffff;
 
           // Skip over the cells occupied by this range in the loop
           lastCharX = range[1] - 1;
 
           // Recalculate width
-          width = cell.getWidth();
+          width = cell.width;
         }
       }
 
@@ -158,7 +153,7 @@ export class DomRendererRowFactory {
       });
 
       // get chars to render for this cell
-      let chars = cell.getChars() || WHITESPACE_CELL_CHAR;
+      let chars = cell.chars || WHITESPACE_CELL_CHAR;
       if (chars === ' ' && (cell.isUnderline() || cell.isOverline())) {
         chars = '\xa0';
       }
@@ -193,7 +188,7 @@ export class DomRendererRowFactory {
           && isLinkHover === oldLinkHover
           && spacing === oldSpacing
           && !isCursorCell
-          && !isJoined
+          && !cell.isJoined
           && !isDecorated
           && isValidJoinRange
         ) {
@@ -227,7 +222,7 @@ export class DomRendererRowFactory {
       oldSpacing = spacing;
       oldIsInSelection = isInSelection;
 
-      if (isJoined) {
+      if (cell.isJoined) {
         // The DOM renderer colors the background of the cursor but for ligatures all cells are
         // joined. The workaround here is to show a cursor around the whole ligature so it shows up,
         // the cursor looks the same when on any character of the ligature though
@@ -286,7 +281,7 @@ export class DomRendererRowFactory {
       if (cell.isInvisible()) {
         text = WHITESPACE_CELL_CHAR;
       } else {
-        text = cell.getChars() || WHITESPACE_CELL_CHAR;
+        text = cell.chars || WHITESPACE_CELL_CHAR;
       }
 
       if (cell.isUnderline()) {
@@ -453,7 +448,7 @@ export class DomRendererRowFactory {
       }
 
       // exclude conditions for cell merging - never merge these
-      if (!isCursorCell && !isJoined && !isDecorated && isValidJoinRange) {
+      if (!isCursorCell && !cell.isJoined && !isDecorated && isValidJoinRange) {
         cellAmount++;
       } else {
         charElement.textContent = text;
@@ -475,8 +470,8 @@ export class DomRendererRowFactory {
     return elements;
   }
 
-  private _applyMinimumContrast(element: HTMLElement, bg: IColor, fg: IColor, cell: ICellData, bgOverride: IColor | undefined, fgOverride: IColor | undefined): boolean {
-    if (this._optionsService.rawOptions.minimumContrastRatio === 1 || treatGlyphAsBackgroundColor(cell.getCode())) {
+  private _applyMinimumContrast(element: HTMLElement, bg: IColor, fg: IColor, cell: RenderCell, bgOverride: IColor | undefined, fgOverride: IColor | undefined): boolean {
+    if (this._optionsService.rawOptions.minimumContrastRatio === 1 || treatGlyphAsBackgroundColor(cell.code)) {
       return false;
     }
 
@@ -504,7 +499,7 @@ export class DomRendererRowFactory {
     return false;
   }
 
-  private _getContrastCache(cell: ICellData): IColorContrastCache {
+  private _getContrastCache(cell: RenderCell): IColorContrastCache {
     if (cell.isDim()) {
       return this._themeService.colors.halfContrastCache;
     }

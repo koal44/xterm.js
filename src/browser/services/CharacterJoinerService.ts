@@ -3,49 +3,13 @@
  * @license MIT
  */
 
-import { IBufferLine, ICellData } from 'common/Types';
+import { IBufferLine } from 'common/Types';
 import { ICharacterJoiner } from 'browser/Types';
-import { AttributeData } from 'common/buffer/AttributeData';
 import { WHITESPACE_CELL_CHAR } from 'common/buffer/Constants';
 import { IBufferService } from 'common/services/Services';
 import { ICharacterJoinerService } from 'browser/services/Services';
+import { RenderCell } from 'common/buffer/RenderCell';
 
-export class JoinedCellData extends AttributeData implements ICellData {
-  private _width: number;
-  // .content carries no meaning for joined CellData, simply nullify it
-  // thus we have to overload all other .content accessors
-  public content: number = 0;
-  public fg: number;
-  public bg: number;
-  public combinedData: string = '';
-
-  constructor(firstCell: ICellData, chars: string, width: number) {
-    super();
-    this.fg = firstCell.fg;
-    this.bg = firstCell.bg;
-    this.combinedData = chars;
-    this._width = width;
-  }
-
-  public isCombined(): boolean {
-    // always mark joined cell data as combined
-    return true;
-  }
-
-  public getWidth(): number {
-    return this._width;
-  }
-
-  public getChars(): string {
-    return this.combinedData;
-  }
-
-  public getCode(): number {
-    // code always gets the highest possible fake codepoint (read as -1)
-    // this is needed as code is used by caches as identifier
-    return 0x1FFFFF;
-  }
-}
 
 export class CharacterJoinerService implements ICharacterJoinerService {
   public serviceBrand: undefined;
@@ -90,7 +54,7 @@ export class CharacterJoinerService implements ICharacterJoinerService {
 
     const ranges: [number, number][] = [];
     const lineStr = line.translateToString(true);
-    const workCell = line.createCell();
+    const workCell = new RenderCell();
 
     // Because some cells can be represented by multiple javascript characters,
     // we track the cell and the string indexes separately. This allows us to
@@ -103,9 +67,9 @@ export class CharacterJoinerService implements ICharacterJoinerService {
     let rangeAttrBG = line.getBg(0);
 
     for (let x = 0; x < line.getTrimmedLength(); x++) {
-      line.loadCell(x, workCell);
+      line.loadRenderCell(x, workCell);
 
-      if (workCell.getWidth() === 0) {
+      if (workCell.width === 0) {
         // If this character is of width 0, skip it.
         continue;
       }
@@ -134,7 +98,7 @@ export class CharacterJoinerService implements ICharacterJoinerService {
         rangeAttrBG = workCell.bg;
       }
 
-      currentStringIndex += workCell.getChars().length || WHITESPACE_CELL_CHAR.length;
+      currentStringIndex += workCell.chars.length || WHITESPACE_CELL_CHAR.length;
     }
 
     // Process any trailing ranges.

@@ -7,6 +7,7 @@ import { IAttributeData, IBufferLine, ICellData, IExtendedAttrs } from 'common/T
 import { DEFAULT_ATTR_DATA, ExtendedAttrs } from 'common/buffer/AttributeData';
 import { CellData } from 'common/buffer/CellData';
 import { Attributes, BgFlags, NULL_CELL_CHAR, NULL_CELL_CODE, NULL_CELL_WIDTH, TAIL_CELL_CODE, TAIL_CELL_WIDTH, WHITESPACE_CELL_CHAR, WHITESPACE_CELL_WIDTH } from 'common/buffer/Constants';
+import { RenderCell } from 'common/buffer/RenderCell';
 import { stringFromCodePoint } from 'common/input/TextDecoder';
 
 /**
@@ -156,6 +157,31 @@ export class BufferLine implements IBufferLine {
       cell.extended = this._extendedAttrs[index]!;
     }
     return cell;
+  }
+
+  public loadRenderCell(index: number, cell: RenderCell): void {
+    const i = index * CELL_SIZE;
+
+    const fg = this._data[i + Cell.FG];
+    cell.fg = fg;
+    const bg = this._data[i + Cell.BG];
+    cell.bg = bg;
+    const ext = (bg & BgFlags.HAS_EXTENDED) ? this._extendedAttrs[index] : undefined;
+    cell.extended.ext = ext ? ext.ext : 0;
+    cell.extended.urlId = ext ? ext.urlId : 0;
+
+    cell.isJoined = false;
+
+    const content = this._data[i + Cell.CONTENT];
+    const width = CellData.width(content);
+    cell.width = width;
+    cell.visWidth = width;
+    const cp = CellData.codepoint(content);
+    // cell.codepoint = cp;
+    const isCombined = CellData.isCombined(content);
+    const chars = isCombined ? (this._combined[index] ?? '') : (cp ? stringFromCodePoint(cp) : '');
+    cell.chars = chars;
+    cell.code = isCombined ? chars.charCodeAt(chars.length - 1) : cp;
   }
 
   /**

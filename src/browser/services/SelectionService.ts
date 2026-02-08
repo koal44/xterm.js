@@ -11,11 +11,12 @@ import { ISelectionRedrawRequestEvent, ISelectionRequestScrollLinesEvent } from 
 import { ICoreBrowserService, IMouseService, IRenderService, ISelectionService } from 'browser/services/Services';
 import { Disposable, toDisposable } from 'vs/base/common/lifecycle';
 import * as Browser from 'common/Platform';
-import { IBufferLine, ICellData, IDisposable } from 'common/Types';
+import { IBufferLine, IDisposable } from 'common/Types';
 import { getRangeLength } from 'common/buffer/BufferRange';
 import { IBuffer } from 'common/buffer/Types';
 import { IBufferService, ICoreService, IOptionsService } from 'common/services/Services';
 import { Emitter } from 'vs/base/common/event';
+import { RenderCell } from 'common/buffer/RenderCell';
 
 /**
  * The number of pixels the mouse needs to be above or below the viewport in
@@ -775,11 +776,12 @@ export class SelectionService extends Disposable implements ISelectionService {
    * @param x The x index in the buffer line to convert.
    */
   private _convertViewportColToCharacterIndex(bufferLine: IBufferLine, x: number): number {
-    const workCell = bufferLine.createCell();
+    const workCell = new RenderCell();
     let charIndex = x;
     for (let i = 0; x >= i; i++) {
-      const length = bufferLine.loadCell(i, workCell).getChars().length;
-      if (workCell.getWidth() === 0) {
+      bufferLine.loadRenderCell(i, workCell);
+      const length = workCell.chars.length;
+      if (workCell.width === 0) {
         // Wide characters aren't included in the line string so decrement the
         // index so the index is back on the wide character.
         charIndex--;
@@ -827,7 +829,7 @@ export class SelectionService extends Disposable implements ISelectionService {
       return undefined;
     }
 
-    const workCell = bufferLine.createCell();
+    const workCell = new RenderCell();
     const line = buffer.translateBufferLineToString(coords[1], false);
 
     // Get actual index, taking into consideration wide characters
@@ -876,10 +878,12 @@ export class SelectionService extends Disposable implements ISelectionService {
       }
 
       // Expand the string in both directions until a space is hit
-      while (startCol > 0 && startIndex > 0 && !this._isCharWordSeparator(bufferLine.loadCell(startCol - 1, workCell))) {
-        bufferLine.loadCell(startCol - 1, workCell);
-        const length = workCell.getChars().length;
-        if (workCell.getWidth() === 0) {
+      while (startCol > 0 && startIndex > 0) {
+        bufferLine.loadRenderCell(startCol - 1, workCell);
+        if (this._isCharWordSeparator(workCell)) break;
+
+        const length = workCell.chars.length;
+        if (workCell.width === 0) {
           // If the next character is a wide char, record it and skip the column
           leftWideCharCount++;
           startCol--;
@@ -892,10 +896,12 @@ export class SelectionService extends Disposable implements ISelectionService {
         startIndex--;
         startCol--;
       }
-      while (endCol < bufferLine.length && endIndex + 1 < line.length && !this._isCharWordSeparator(bufferLine.loadCell(endCol + 1, workCell))) {
-        bufferLine.loadCell(endCol + 1, workCell);
-        const length = workCell.getChars().length;
-        if (workCell.getWidth() === 2) {
+      while (endCol < bufferLine.length && endIndex + 1 < line.length) {
+        bufferLine.loadRenderCell(endCol + 1, workCell);
+        if (this._isCharWordSeparator(workCell)) break;
+
+        const length = workCell.chars.length;
+        if (workCell.width === 2) {
           // If the next character is a wide char, record it and skip the column
           rightWideCharCount++;
           endCol++;
@@ -1017,13 +1023,13 @@ export class SelectionService extends Disposable implements ISelectionService {
    * word logic.
    * @param cell The cell to check.
    */
-  private _isCharWordSeparator(cell: ICellData): boolean {
+  private _isCharWordSeparator(cell: RenderCell): boolean {
     // Zero width characters are never separators as they are always to the
     // right of wide characters
-    if (cell.getWidth() === 0) {
+    if (cell.width === 0) {
       return false;
     }
-    return this._optionsService.rawOptions.wordSeparator.indexOf(cell.getChars()) >= 0;
+    return this._optionsService.rawOptions.wordSeparator.indexOf(cell.chars) >= 0;
   }
 
   /**

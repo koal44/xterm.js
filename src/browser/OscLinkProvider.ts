@@ -5,6 +5,7 @@
 
 import { IBufferRange, ILink } from 'browser/Types';
 import { ILinkProvider } from 'browser/services/Services';
+import { RenderCell } from 'common/buffer/RenderCell';
 import { IBufferService, IOptionsService, IOscLinkService } from 'common/services/Services';
 
 export class OscLinkProvider implements ILinkProvider {
@@ -24,7 +25,7 @@ export class OscLinkProvider implements ILinkProvider {
 
     const result: ILink[] = [];
     const linkHandler = this._optionsService.rawOptions.linkHandler;
-    const cell = line.createCell();
+    const cell = new RenderCell();
     const lineLength = line.getTrimmedLength();
     let currentLinkId = -1;
     let currentStart = -1;
@@ -36,7 +37,7 @@ export class OscLinkProvider implements ILinkProvider {
         continue;
       }
 
-      line.loadCell(x, cell);
+      line.loadRenderCell(x, cell);
       if (cell.hasExtendedAttrs() && cell.extended.urlId) {
         if (currentStart === -1) {
           currentStart = x;

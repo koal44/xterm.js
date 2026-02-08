@@ -10,8 +10,7 @@ import { CursorBlinkStateManager } from './CursorBlinkStateManager';
 import { observeDevicePixelDimensions } from './DevicePixelObserver';
 import { IRenderDimensions, IRenderer, IRequestRedrawEvent } from 'browser/renderer/shared/Types';
 import { ICharSizeService, ICharacterJoinerService, ICoreBrowserService, IThemeService } from 'browser/services/Services';
-import { IBufferLine, ICellData } from 'common/Types';
-import { AttributeData } from 'common/buffer/AttributeData';
+import { IBufferLine } from 'common/Types';
 import { Attributes, NULL_CELL_CHAR, NULL_CELL_CODE } from 'common/buffer/Constants';
 import { ICoreService, IDecorationService, IOptionsService } from 'common/services/Services';
 import { Terminal } from '@xterm/xterm';
@@ -25,6 +24,7 @@ import { Emitter, Event } from 'vs/base/common/event';
 import { addDisposableListener } from 'vs/base/browser/dom';
 import { combinedDisposable, Disposable, MutableDisposable, toDisposable } from 'vs/base/common/lifecycle';
 import { createRenderDimensions } from 'browser/renderer/shared/RendererUtils';
+import { RenderCell } from 'common/buffer/RenderCell';
 
 export class WebglRenderer extends Disposable implements IRenderer {
   private _renderLayers: IRenderLayer[];
@@ -378,8 +378,7 @@ export class WebglRenderer extends Disposable implements IRenderer {
 
   private _updateModel(start: number, end: number): void {
     const terminal = this._core;
-    let workCell: ICellData;
-    let cell: ICellData;
+    const cell = new RenderCell();
 
     // Declare variable ahead of time to avoid garbage collection
     let lastBg: number;
@@ -387,7 +386,6 @@ export class WebglRenderer extends Disposable implements IRenderer {
     let row: number;
     let line: IBufferLine;
     let joinedRanges: [number, number][];
-    let isJoined: boolean;
     let skipJoinedCheckUntilX: number = 0;
     let isValidJoinRange: boolean = true;
     let lastCharX: number;
@@ -418,22 +416,17 @@ export class WebglRenderer extends Disposable implements IRenderer {
     for (y = start; y <= end; y++) {
       row = y + terminal.buffer.ydisp;
       line = terminal.buffer.lines.get(row)!;
-      workCell ??= line.createCell();
-      cell = workCell;
       this._model.lineLengths[y] = 0;
       isCursorRow = cursorY === row;
       skipJoinedCheckUntilX = 0;
       joinedRanges = this._characterJoinerService.getJoinedCharacters(row);
       for (x = 0; x < terminal.cols; x++) {
         lastBg = this._cellColorResolver.result.bg;
-        line.loadCell(x, cell);
+        line.loadRenderCell(x, cell);
 
         if (x === 0) {
           lastBg = this._cellColorResolver.result.bg;
         }
-
-        // If true, indicates that the current character(s) to draw were joined.
-        isJoined = false;
 
         // Indicates whether this cell is part of a joined range that should be ignored as it cannot
         // be rendered entirely, like the selection state differs across the range.
@@ -458,23 +451,22 @@ export class WebglRenderer extends Disposable implements IRenderer {
           if (!isValidJoinRange) {
             skipJoinedCheckUntilX = range[1];
           } else {
-            isJoined = true;
+            cell.isJoined = true;
 
             // We already know the exact start and end column of the joined range,
             // so we get the string and width representing it directly.
-            cell = new JoinedCellData(
-              cell,
-              line!.translateToString(true, range[0], range[1]),
-              range[1] - range[0]
-            );
+            cell.chars = line.translateToString(true, range[0], range[1]);
+            cell.code = 0x1fffff;
+            cell.width = range[1] - range[0];
+            cell.visWidth = cell.width;
 
             // Skip over the cells occupied by this range in the loop
             lastCharX = range[1] - 1;
           }
         }
 
-        chars = cell.getChars();
-        code = cell.getCode();
+        chars = cell.chars;
+        code = cell.code;
         i = ((y * terminal.cols) + x) * RENDER_MODEL_INDICIES_PER_CELL;
 
         // Load colors/resolve overrides into work colors
@@ -486,12 +478,12 @@ export class WebglRenderer extends Disposable implements IRenderer {
             this._model.cursor = {
               x: cursorX,
               y: viewportRelativeCursorY,
-              width: cell.getWidth(),
+              width: cell.width,
               style: this._coreBrowserService.isFocused ? cursorStyle : terminal.options.cursorInactiveStyle,
               cursorWidth: terminal.options.cursorWidth,
               dpr: this._devicePixelRatio
             };
-            lastCursorX = cursorX + cell.getWidth() - 1;
+            lastCursorX = cursorX + cell.width - 1;
           }
           if (x >= cursorX && x <= lastCursorX &&
               ((this._coreBrowserService.isFocused &&
@@ -531,13 +523,10 @@ export class WebglRenderer extends Disposable implements IRenderer {
         this._model.cells[i + RENDER_MODEL_FG_OFFSET] = this._cellColorResolver.result.fg;
         this._model.cells[i + RENDER_MODEL_EXT_OFFSET] = this._cellColorResolver.result.ext;
 
-        width = cell.getWidth();
+        width = cell.width;
         this._glyphRenderer.value!.updateCell(x, y, code, this._cellColorResolver.result.bg, this._cellColorResolver.result.fg, this._cellColorResolver.result.ext, chars, width, lastBg);
 
-        if (isJoined) {
-          // Restore work cell
-          cell = workCell;
-
+        if (cell.isJoined) {
           // Null out non-first cells
           for (x++; x <= lastCharX; x++) {
             j = ((y * terminal.cols) + x) * RENDER_MODEL_INDICIES_PER_CELL;
@@ -635,44 +624,6 @@ export class WebglRenderer extends Disposable implements IRenderer {
   private _requestRedrawCursor(): void {
     const cursorY = this._terminal.buffer.active.cursorY;
     this._onRequestRedraw.fire({ start: cursorY, end: cursorY });
-  }
-}
-
-// TODO: Share impl with core
-export class JoinedCellData extends AttributeData implements ICellData {
-  private _width: number;
-  // .content carries no meaning for joined CellData, simply nullify it
-  // thus we have to overload all other .content accessors
-  public content: number = 0;
-  public fg: number;
-  public bg: number;
-  public combinedData: string = '';
-
-  constructor(firstCell: ICellData, chars: string, width: number) {
-    super();
-    this.fg = firstCell.fg;
-    this.bg = firstCell.bg;
-    this.combinedData = chars;
-    this._width = width;
-  }
-
-  public isCombined(): boolean {
-    // always mark joined cell data as combined
-    return true;
-  }
-
-  public getWidth(): number {
-    return this._width;
-  }
-
-  public getChars(): string {
-    return this.combinedData;
-  }
-
-  public getCode(): number {
-    // code always gets the highest possible fake codepoint (read as -1)
-    // this is needed as code is used by caches as identifier
-    return 0x1FFFFF;
   }
 }
 

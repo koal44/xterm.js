@@ -10,6 +10,7 @@ import { IParams } from 'common/parser/Types';
 import { ICoreMouseService, ICoreService, IOptionsService, IUnicodeService } from 'common/services/Services';
 import { IFunctionIdentifier, ITerminalOptions as IPublicTerminalOptions } from '@xterm/xterm';
 import type { Emitter, Event } from 'vs/base/common/event';
+import { RenderCell } from 'common/buffer/RenderCell';
 
 export interface ICoreTerminal {
   coreMouseService: ICoreMouseService;
@@ -222,6 +223,7 @@ export interface IBufferLine {
   length: number;
   isWrapped: boolean;
   loadCell(index: number, cell: ICellData): ICellData;
+  loadRenderCell(index: number, cell: RenderCell): void;
   // setCell(index: number, cell: ICellData): void;
   setCellToNull(index: number, attr?: IAttributeData): void;
   setCellToTail(index: number, attr?: IAttributeData): void;
