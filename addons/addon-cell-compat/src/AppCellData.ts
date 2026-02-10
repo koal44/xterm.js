@@ -19,7 +19,7 @@ export class AppCellData extends AttributeData implements ICellData {
    *  - bits 24..25 : movWidth         : (0..3) 3 => width stored out-of-band
    *  - bits 26..27 : delWidth         : (0..3) 3 => width stored out-of-band
    *  - bits 28..29 : visWidth         : (0..3)
-   *  - bit  30     : visRoot          : (0..1)
+   *  - bit  30     : visJoin          : (0..1)
    *  - bit  31     : reserved         : (0)
    */
   private static readonly _codepointMask   = 0x001F_FFFF; // (1<<21)-1, bits 0..20
@@ -32,8 +32,8 @@ export class AppCellData extends AttributeData implements ICellData {
   private static readonly _delWidthMask    = 0x0C00_0000; // 3<<26
   private static readonly _visWidthShift   = 28;
   private static readonly _visWidthMask    = 0x3000_0000; // 3<<28
-  private static readonly _visRootShift    = 30;
-  private static readonly _visRootMask     = 0x4000_0000; // 1<<30
+  private static readonly _visJoinShift    = 30;
+  private static readonly _visJoinMask     = 0x4000_0000; // 1<<30
   private static readonly _reservedMask    = 0x8000_0000; // 1<<31 (must be 0)
   private static readonly _hasContentMask  = AppCellData._codepointMask | AppCellData._isCombinedMask;
   private static readonly _sideLoad        = 3;           // 0b11 sentinel for movWidth/delWidth when combined
@@ -46,10 +46,10 @@ export class AppCellData extends AttributeData implements ICellData {
   public static movWidth(content: number): number { return (content & AppCellData._movWidthMask) >>> AppCellData._movWidthShift; }
   public static delWidth(content: number): number { return (content & AppCellData._delWidthMask) >>> AppCellData._delWidthShift; }
   public static visWidth(content: number): number { return (content & AppCellData._visWidthMask) >>> AppCellData._visWidthShift; }
-  public static isVisRoot(content: number): boolean { return !!(content & AppCellData._visRootMask); }
+  public static visJoin(content: number): boolean { return !!(content & AppCellData._visJoinMask); }
 
   /** Packers */
-  public static packContent(cp: number, combined: boolean, appWidth: number, movWidth: number, delWidth: number, visWidth: number, visRoot: boolean): number {
+  public static packContent(cp: number, combined: boolean, appWidth: number, movWidth: number, delWidth: number, visWidth: number, visJoin: boolean): number {
     const mw = movWidth <= 2 ? movWidth : AppCellData._sideLoad;
     const dw = delWidth <= 2 ? delWidth : AppCellData._sideLoad;
     const v =
@@ -58,7 +58,7 @@ export class AppCellData extends AttributeData implements ICellData {
       (mw       << AppCellData._movWidthShift) |
       (dw       << AppCellData._delWidthShift) |
       (visWidth << AppCellData._visWidthShift) |
-      (+visRoot << AppCellData._visRootShift);
+      (+visJoin << AppCellData._visJoinShift);
     return v >>> 0;
   }
 
@@ -88,7 +88,7 @@ export class AppCellData extends AttributeData implements ICellData {
     return AppCellData._packCpCombined(0, true);
   }
 
-  public static from(chars: string, appWidth: number, movWidth: number, delWidth: number, visWidth: number, visRoot: boolean, attr?: IAttributeData): AppCellData {
+  public static from(chars: string, appWidth: number, movWidth: number, delWidth: number, visWidth: number, visJoin: boolean, attr?: IAttributeData): AppCellData {
     const obj = new AppCellData();
     const cpCombined = AppCellData._cpCombinedBits(chars);
     const cp = AppCellData.codepoint(cpCombined);
@@ -96,7 +96,7 @@ export class AppCellData extends AttributeData implements ICellData {
     obj.combinedData = AppCellData.isCombined(cpCombined) ? chars : '';
     obj.sideloadMovWidth = movWidth > 2 ? movWidth : 0;
     obj.sideloadDelWidth = delWidth > 2 ? delWidth : 0;
-    obj.content = AppCellData.packContent(cp, isCombined, appWidth, movWidth, delWidth, visWidth, visRoot);
+    obj.content = AppCellData.packContent(cp, isCombined, appWidth, movWidth, delWidth, visWidth, visJoin);
     if (attr) {
       obj.fg = attr.fg;
       obj.bg = attr.bg;
@@ -142,8 +142,8 @@ export class AppCellData extends AttributeData implements ICellData {
   }
 
   /** Whether this cell is the root of a rendered cell. */
-  public isVisRoot(): boolean {
-    return AppCellData.isVisRoot(this.content);
+  public isVisJoin(): boolean {
+    return AppCellData.visJoin(this.content);
   }
 
   /** JS string of the content. */

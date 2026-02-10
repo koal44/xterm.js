@@ -9,7 +9,6 @@ import { DomRendererRowFactory } from 'browser/renderer/dom/DomRendererRowFactor
 import { NULL_CELL_CODE, NULL_CELL_WIDTH, NULL_CELL_CHAR, DEFAULT_ATTR, FgFlags, BgFlags, Attributes, UnderlineStyle } from 'common/buffer/Constants';
 import { BufferLine } from 'common/buffer/BufferLine';
 import { DEFAULT_ATTR_DATA } from 'common/buffer/AttributeData';
-import { IBufferLine } from 'common/Types';
 import { CellData } from 'common/buffer/CellData';
 import { MockCoreService, MockDecorationService, MockOptionsService } from 'common/TestUtils.test';
 import { MockCharacterJoinerService, MockCoreBrowserService, MockThemeService } from 'browser/TestUtils.test';
