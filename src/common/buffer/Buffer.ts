@@ -41,7 +41,7 @@ export class Buffer implements IBuffer {
   public savedOriginMode: boolean = false;
   public savedWraparoundMode: boolean = true;
   public markers: Marker[] = [];
-  private _lineCtor!: new (cols: number, fill?: ICellData, isWrapped?: boolean) => IBufferLine;
+  private _lineCtor!: new (cols: number, nullFillAttr?: IAttributeData, isWrapped?: boolean) => IBufferLine;
   private _dummyLine!: IBufferLine;
   private _nullCell!: ICellData;
   private _cols: number;
@@ -62,7 +62,7 @@ export class Buffer implements IBuffer {
     this.setupTabStops();
   }
 
-  public setLineCtor(lineCtor: new (cols: number, fill?: ICellData, isWrapped?: boolean) => IBufferLine): void {
+  public setLineCtor(lineCtor: new (cols: number, nullFillAttr?: IAttributeData, isWrapped?: boolean) => IBufferLine): void {
     this._lineCtor = lineCtor;
     this._dummyLine = new this._lineCtor(this._cols);
     this._nullCell = this._dummyLine.createNullCell();
@@ -86,7 +86,7 @@ export class Buffer implements IBuffer {
   }
 
   public getBlankLine(attr: IAttributeData, isWrapped?: boolean): IBufferLine {
-    return new this._lineCtor(this._bufferService.cols, this.getNullCell(attr), isWrapped);
+    return new this._lineCtor(this._bufferService.cols, attr, isWrapped);
   }
 
   public get hasScrollback(): boolean {
@@ -149,9 +149,6 @@ export class Buffer implements IBuffer {
    * @param newRows The new number of rows.
    */
   public resize(newCols: number, newRows: number): void {
-    // store reference to null cell with default attrs
-    const nullCell = this.getNullCell(DEFAULT_ATTR_DATA);
-
     // count bufferlines with overly big memory to be cleaned afterwards
     let dirtyMemoryLines = 0;
 
@@ -185,7 +182,7 @@ export class Buffer implements IBuffer {
             if (this._optionsService.rawOptions.windowsPty.backend !== undefined || this._optionsService.rawOptions.windowsPty.buildNumber !== undefined) {
               // Just add the new missing rows on Windows as conpty reprints the screen with it's
               // view of the world. Once a line enters scrollback for conpty it remains there
-              this.lines.push(new this._lineCtor(newCols, nullCell));
+              this.lines.push(new this._lineCtor(newCols, DEFAULT_ATTR_DATA));
             } else {
               if (this.ybase > 0 && this.lines.length <= this.ybase + this.y + addToY + 1) {
                 // There is room above the buffer and there are no empty elements below the line,
@@ -199,7 +196,7 @@ export class Buffer implements IBuffer {
               } else {
                 // Add a blank line if there is no buffer left at the top to scroll to, or if there
                 // are blank lines after the cursor
-                this.lines.push(new this._lineCtor(newCols, nullCell));
+                this.lines.push(new this._lineCtor(newCols, DEFAULT_ATTR_DATA));
               }
             }
           }
@@ -333,7 +330,6 @@ export class Buffer implements IBuffer {
   }
 
   private _reflowLargerAdjustViewport(newCols: number, newRows: number, countRemoved: number): void {
-    const nullCell = this.getNullCell(DEFAULT_ATTR_DATA);
     // Adjust viewport based on number of items removed
     let viewportAdjustments = countRemoved;
     while (viewportAdjustments-- > 0) {
@@ -343,7 +339,7 @@ export class Buffer implements IBuffer {
         }
         if (this.lines.length < newRows) {
           // Add an extra row at the bottom of the viewport
-          this.lines.push(new this._lineCtor(newCols, nullCell));
+          this.lines.push(new this._lineCtor(newCols, DEFAULT_ATTR_DATA));
         }
       } else {
         if (this.ydisp === this.ybase) {

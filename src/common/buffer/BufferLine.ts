@@ -4,7 +4,7 @@
  */
 
 import { IAttributeData, IBufferLine, ICellData, IExtendedAttrs } from 'common/Types';
-import { DEFAULT_ATTR_DATA, ExtendedAttrs } from 'common/buffer/AttributeData';
+import { DEFAULT_ATTR_DATA } from 'common/buffer/AttributeData';
 import { CellData } from 'common/buffer/CellData';
 import { Attributes, BgFlags, NULL_CELL_CHAR, NULL_CELL_CODE, NULL_CELL_WIDTH, TAIL_CELL_CODE, TAIL_CELL_WIDTH, WHITESPACE_CELL_CHAR, WHITESPACE_CELL_WIDTH } from 'common/buffer/Constants';
 import { RenderCell } from 'common/buffer/RenderCell';
@@ -62,9 +62,9 @@ export class BufferLine implements IBufferLine {
   protected _extendedAttrs: {[index: number]: IExtendedAttrs | undefined} = {};
   public length: number;
 
-  constructor(cols: number, fillCellData?: ICellData, public isWrapped: boolean = false) {
+  constructor(cols: number, nullFillAttr?: IAttributeData, public isWrapped: boolean = false) {
     this._data = new Uint32Array(cols * CELL_SIZE);
-    const cell = fillCellData ?? this.createNullCell();
+    const cell = this.getNullCell(nullFillAttr);
     for (let i = 0; i < cols; ++i) {
       this.setCell(i, cell);
     }
@@ -181,7 +181,7 @@ export class BufferLine implements IBufferLine {
     const isCombined = CellData.isCombined(content);
     const chars = isCombined ? (this._combined[index] ?? '') : (cp ? stringFromCodePoint(cp) : '');
     cell.chars = chars;
-    cell.code = isCombined ? chars.charCodeAt(chars.length - 1) : cp;
+    cell.code = isCombined ? (chars ? chars.charCodeAt(chars.length - 1) : 0) : cp;
   }
 
   /**
@@ -621,15 +621,17 @@ export class BufferLine implements IBufferLine {
   }
 
   private _nullCell = this.createNullCell();
-  public getNullCell(attr?: IAttributeData): CellData {
+  public getNullCell(attr?: IAttributeData): ICellData {
     if (attr) {
       this._nullCell.fg = attr.fg;
       this._nullCell.bg = attr.bg;
-      this._nullCell.extended = attr.extended;
+      this._nullCell.extended.ext = attr.extended.ext;
+      this._nullCell.extended.urlId = attr.extended.urlId;
     } else {
       this._nullCell.fg = 0;
       this._nullCell.bg = 0;
-      this._nullCell.extended = new ExtendedAttrs();
+      this._nullCell.extended.ext = 0;
+      this._nullCell.extended.urlId = 0;
     }
     return this._nullCell;
   }
