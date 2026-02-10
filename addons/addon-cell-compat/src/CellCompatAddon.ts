@@ -1,6 +1,9 @@
 import type { Terminal, ITerminalAddon } from '@xterm/xterm';
 import { UcVerCompatProvider } from './UcVerCompatProvider';
-import { CompatTable, CompatRange } from 'CompatTable';
+import { CompatTable, CompatRange } from './CompatTable';
+import { BufferSet } from 'common/buffer/BufferSet';
+import { BufferLine } from 'common/buffer/BufferLine';
+import { CompatBufferLine } from './CompatBufferLine';
 
 export class CellCompatAddon implements ITerminalAddon {
   private _provider?: UcVerCompatProvider;
@@ -36,4 +39,17 @@ export class CellCompatAddon implements ITerminalAddon {
     })));
   }
 
+  public setEnable(enable: boolean, term: Terminal): void {
+    setLineCtor(term, enable ? CompatBufferLine : BufferLine);
+    term.reset();
+  }
+}
+
+type LineCtor = Parameters<BufferSet['setLineCtor']>[0];
+function setLineCtor(term: any, ctor: LineCtor): void {
+  const buffers = term?._core?._bufferService?.buffers; // BufferSet
+  if (!buffers?.setLineCtor) {
+    throw new Error('[CellCompatAddon] term._core._bufferService.buffers.setLineCtor not found');
+  }
+  buffers.setLineCtor(ctor);
 }

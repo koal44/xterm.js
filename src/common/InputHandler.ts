@@ -628,7 +628,7 @@ export class InputHandler extends Disposable implements IInputHandler {
         // if empty cell after fullwidth, need to go 2 cells back
         // it is save to step 2 cells back here
         // since an empty cell is only set by fullwidth chars
-        bufferRow.addCodepointToCell(this._activeBuffer.x - offset, code, chWidth);
+        bufferRow.addCodepointToCell(this._activeBuffer.x - offset, code, chWidth, currentInfo);
         for (let delta = chWidth - oldWidth; --delta >= 0;) {
           bufferRow.setCellToTail(this._activeBuffer.x++, curAttr);
         }
@@ -648,7 +648,7 @@ export class InputHandler extends Disposable implements IInputHandler {
       }
 
       // write current char to buffer and advance cursor
-      bufferRow.setCellFromCodepoint(this._activeBuffer.x++, code, chWidth, curAttr);
+      bufferRow.setCellFromCodepoint(this._activeBuffer.x++, code, chWidth, curAttr, currentInfo);
 
       // fullwidth char - also set next cell to placeholder stub and advance cursor
       // for graphemes bigger than fullwidth we can simply loop to zero

@@ -10,7 +10,7 @@ import { ExtendedAttrs, DEFAULT_ATTR_DATA } from 'common/buffer/AttributeData';
 import { BufferLine } from 'common/buffer/BufferLine';
 import { getWrappedLineTrimmedLength, reflowLargerApplyNewLayout, reflowLargerCreateNewLayout, reflowLargerGetLinesToRemove, reflowSmallerGetNewLineLengths } from 'common/buffer/BufferReflow';
 import { Marker } from 'common/buffer/Marker';
-import { IBuffer } from 'common/buffer/Types';
+import { IBuffer, IBufferLineCtor } from 'common/buffer/Types';
 import { DEFAULT_CHARSET } from 'common/data/Charsets';
 import { IBufferService, IOptionsService } from 'common/services/Services';
 
@@ -51,11 +51,12 @@ export class Buffer implements IBuffer {
   constructor(
     private _hasScrollback: boolean,
     private _optionsService: IOptionsService,
-    private _bufferService: IBufferService
+    private _bufferService: IBufferService,
+    lineCtor: IBufferLineCtor = BufferLine
   ) {
     this._cols = this._bufferService.cols;
     this._rows = this._bufferService.rows;
-    this.setLineCtor(BufferLine);
+    this.setLineCtor(lineCtor);
     this.lines = new CircularList<IBufferLine>(this._getCorrectBufferLength(this._rows));
     this.scrollTop = 0;
     this.scrollBottom = this._rows - 1;

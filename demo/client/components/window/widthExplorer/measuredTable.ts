@@ -180,3 +180,8 @@ export class MeasuredTable {
     return false;
   }
 }
+
+export const DEFAULT_MEASURED_TABLE: MeasuredTable = new MeasuredTable(
+  'default',
+  [{ start: 0x0, end: 0x10ffff, widths: { col: 1, mov: 1, del: 1 } }]
+);

@@ -6,9 +6,10 @@
 import { Disposable } from 'vs/base/common/lifecycle';
 import { IAttributeData } from 'common/Types';
 import { Buffer } from 'common/buffer/Buffer';
-import { IBuffer, IBufferSet } from 'common/buffer/Types';
+import { IBuffer, IBufferLineCtor, IBufferSet } from 'common/buffer/Types';
 import { IBufferService, IOptionsService } from 'common/services/Services';
 import { Emitter } from 'vs/base/common/event';
+import { BufferLine } from 'common/buffer/BufferLine';
 
 /**
  * The BufferSet represents the set of two buffers used by xterm terminals (normal and alt) and
@@ -18,6 +19,7 @@ export class BufferSet extends Disposable implements IBufferSet {
   private _normal!: Buffer;
   private _alt!: Buffer;
   private _activeBuffer!: Buffer;
+  private _lineCtor: IBufferLineCtor = BufferLine;
 
   private readonly _onBufferActivate = this._register(new Emitter<{ activeBuffer: IBuffer, inactiveBuffer: IBuffer }>());
   public readonly onBufferActivate = this._onBufferActivate.event;
@@ -36,12 +38,12 @@ export class BufferSet extends Disposable implements IBufferSet {
   }
 
   public reset(): void {
-    this._normal = new Buffer(true, this._optionsService, this._bufferService);
+    this._normal = new Buffer(true, this._optionsService, this._bufferService, this._lineCtor);
     this._normal.fillViewportRows();
 
     // The alt buffer should never have scrollback.
     // See http://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h2-The-Alternate-Screen-Buffer
-    this._alt = new Buffer(false, this._optionsService, this._bufferService);
+    this._alt = new Buffer(false, this._optionsService, this._bufferService, this._lineCtor);
     this._activeBuffer = this._normal;
     this._onBufferActivate.fire({
       activeBuffer: this._normal,
@@ -130,5 +132,15 @@ export class BufferSet extends Disposable implements IBufferSet {
   public setupTabStops(i?: number): void {
     this._normal.setupTabStops(i);
     this._alt.setupTabStops(i);
+  }
+
+  /**
+   * Sets the line constructor to use for new lines in both buffers.
+   * Necessary for addons that have custom BufferLine implementations, such as CellCompatAddon.
+   */
+  public setLineCtor(lineCtor: IBufferLineCtor): void {
+    this._lineCtor = lineCtor;
+    this._normal?.setLineCtor(lineCtor);
+    this._alt?.setLineCtor(lineCtor);
   }
 }

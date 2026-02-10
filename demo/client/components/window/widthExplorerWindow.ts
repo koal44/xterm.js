@@ -27,7 +27,7 @@ import { CellCompatAddon } from '@xterm/addon-cell-compat';
 import { BrowserStorage } from 'components/window/widthExplorer/browserStorage';
 import { addRow, mkButton, mkCheckbox, mkLabeledInput, mkNumericUpDown, mkSelect } from 'components/window/widthExplorer/domUtil';
 import { Measurer } from 'components/window/widthExplorer/measurer';
-import { MeasuredWidths, MeasuredTable } from 'components/window/widthExplorer/measuredTable';
+import { MeasuredWidths, MeasuredTable, DEFAULT_MEASURED_TABLE } from 'components/window/widthExplorer/measuredTable';
 import { ignoreUnprintablesInTable } from 'components/window/widthExplorer/unprintables';
 import { decodeData, escapeForLog, formatCodePoints, hexToStr } from 'components/window/widthExplorer/stringUtil';
 import { CircularList } from 'components/window/widthExplorer/circularList';
@@ -471,12 +471,17 @@ export class WidthExplorerWindow extends BaseWindow {
         }
 
         if (enabled) {
+          this._cellCompat.setEnable(true, this._terminal);
           this._prevUcProvider = this._terminal.unicode.activeVersion;
-          if (!this._profile.compatPreset.ranges) return;
-          this._cellCompat.loadCompatTable(this._profile.compatPreset);
+          this._cellCompat.loadCompatTable(this._profile?.compatPreset ?? DEFAULT_MEASURED_TABLE);
           this._terminal.unicode.activeVersion = 'compat';
         } else {
+          this._cellCompat.setEnable(false, this._terminal);
           this._terminal.unicode.activeVersion = this._prevUcProvider || '6';
+        }
+        // clear screen to reprint line after bufferset.reset
+        if (this._profile) {
+          this._inject(this._profile?.keys.clearScreen);
         }
       }).label,
     );
@@ -494,6 +499,12 @@ export class WidthExplorerWindow extends BaseWindow {
   }
 
   private async _setProfile(id: AppId): Promise<void> {
+    if (this._profile) {
+      if (this._profile.clearLineNeedsEnd) this._inject(this._profile.keys.end);
+      this._inject(this._profile.keys.clearLine);
+      this._inject(this._profile.keys.clearScreen);
+    }
+
     const oldId = this._profile?.id;
     this._profile = APP_PROFILES.find(p => p.id === id)!;
     if (oldId === this._profile.id) return;

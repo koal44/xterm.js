@@ -54,3 +54,9 @@ export interface IBufferSet extends IDisposable {
   resize(newCols: number, newRows: number): void;
   setupTabStops(i?: number): void;
 }
+
+export type IBufferLineCtor = new (
+  cols: number,
+  nullFillAttr?: IAttributeData,
+  isWrapped?: boolean
+) => IBufferLine;
