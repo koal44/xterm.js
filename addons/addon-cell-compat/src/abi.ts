@@ -79,7 +79,7 @@ export const TAIL_CELL_PROPS = packProps({
   appWidth: 0,
   movWidth: 0,
   delWidth: 0,
-  visJoin: false,
+  visJoin: true,
   visWidth: 0,
   uc17State: 0,
 });

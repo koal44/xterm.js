@@ -11,7 +11,7 @@ import { observeDevicePixelDimensions } from './DevicePixelObserver';
 import { IRenderDimensions, IRenderer, IRequestRedrawEvent } from 'browser/renderer/shared/Types';
 import { ICharSizeService, ICharacterJoinerService, ICoreBrowserService, IThemeService } from 'browser/services/Services';
 import { IBufferLine } from 'common/Types';
-import { Attributes, NULL_CELL_CHAR, NULL_CELL_CODE } from 'common/buffer/Constants';
+import { Attributes, NULL_CELL_CODE } from 'common/buffer/Constants';
 import { ICoreService, IDecorationService, IOptionsService } from 'common/services/Services';
 import { Terminal } from '@xterm/xterm';
 import { GlyphRenderer } from './GlyphRenderer';
@@ -385,18 +385,11 @@ export class WebglRenderer extends Disposable implements IRenderer {
     let y: number;
     let row: number;
     let line: IBufferLine;
-    let joinedRanges: [number, number][];
-    let skipJoinedCheckUntilX: number = 0;
-    let isValidJoinRange: boolean = true;
-    let lastCharX: number;
-    let range: [number, number];
-    let isCursorRow: boolean;
-    let chars: string;
-    let code: number;
-    let width: number;
+    let dx: number;
     let i: number;
     let x: number;
-    let j: number;
+    let vx: number;
+    let dvx: number;
     start = clamp(start, terminal.rows - 1, 0);
     end = clamp(end, terminal.rows - 1, 0);
     const cursorStyle = this._coreService.decPrivateModes.cursorStyle ?? terminal.options.cursorStyle ?? 'block';
@@ -417,57 +410,29 @@ export class WebglRenderer extends Disposable implements IRenderer {
       row = y + terminal.buffer.ydisp;
       line = terminal.buffer.lines.get(row)!;
       this._model.lineLengths[y] = 0;
-      isCursorRow = cursorY === row;
-      skipJoinedCheckUntilX = 0;
-      joinedRanges = this._characterJoinerService.getJoinedCharacters(row);
-      for (x = 0; x < terminal.cols; x++) {
-        lastBg = this._cellColorResolver.result.bg;
+      vx = 0;
+      lastBg = this._cellColorResolver.result.bg;
+      for (x = 0; x < terminal.cols; ) {
         line.loadRenderCell(x, cell);
+        if (cell.width === 0) { x++; continue; }
 
-        if (x === 0) {
-          lastBg = this._cellColorResolver.result.bg;
+        dx = 1;
+        dvx = 0;
+
+        // process graphemes
+        if (!cell.visJoin) {
+          while (line.getVisJoin(x + dx)) dx++;
+
+          if (dx > 1) {
+            cell.charJoined = true;
+            cell.chars = line.translateToString(true, x, x + dx);
+            cell.code = fnv1a(cell.chars);
+            cell.visWidth = line.getVisWidth(line.snapLeftToHeadCell(x + dx - 1));
+          }
+          dvx = cell.visWidth;
         }
 
-        // Indicates whether this cell is part of a joined range that should be ignored as it cannot
-        // be rendered entirely, like the selection state differs across the range.
-        isValidJoinRange = (x >= skipJoinedCheckUntilX);
-
-        lastCharX = x;
-
-        // Process any joined character ranges as needed. Because of how the
-        // ranges are produced, we know that they are valid for the characters
-        // and attributes of our input.
-        if (joinedRanges.length > 0 && x === joinedRanges[0][0] && isValidJoinRange) {
-          range = joinedRanges.shift()!;
-
-          // If the ligature's selection state is not consistent, don't join it. This helps the
-          // selection render correctly regardless whether they should be joined.
-          const firstSelectionState = this._model.selection.isCellSelected(this._terminal, range[0], row);
-          for (i = range[0] + 1; i < range[1]; i++) {
-            isValidJoinRange &&= (firstSelectionState === this._model.selection.isCellSelected(this._terminal, i, row));
-          }
-          // Similarly, if the cursor is in the ligature, don't join it.
-          isValidJoinRange &&= !isCursorRow || cursorX < range[0] || cursorX >= range[1];
-          if (!isValidJoinRange) {
-            skipJoinedCheckUntilX = range[1];
-          } else {
-            cell.isJoined = true;
-
-            // We already know the exact start and end column of the joined range,
-            // so we get the string and width representing it directly.
-            cell.chars = line.translateToString(true, range[0], range[1]);
-            cell.code = 0x1fffff;
-            cell.width = range[1] - range[0];
-            cell.visWidth = cell.width;
-
-            // Skip over the cells occupied by this range in the loop
-            lastCharX = range[1] - 1;
-          }
-        }
-
-        chars = cell.chars;
-        code = cell.code;
-        i = ((y * terminal.cols) + x) * RENDER_MODEL_INDICIES_PER_CELL;
+        i = ((y * terminal.cols) + vx) * RENDER_MODEL_INDICIES_PER_CELL;
 
         // Load colors/resolve overrides into work colors
         this._cellColorResolver.resolve(cell, x, row, this.dimensions.device.cell.width);
@@ -476,7 +441,7 @@ export class WebglRenderer extends Disposable implements IRenderer {
         if (isCursorVisible && row === cursorY) {
           if (x === cursorX) {
             this._model.cursor = {
-              x: cursorX,
+              x: vx,
               y: viewportRelativeCursorY,
               width: cell.width,
               style: this._coreBrowserService.isFocused ? cursorStyle : terminal.options.cursorInactiveStyle,
@@ -498,48 +463,45 @@ export class WebglRenderer extends Disposable implements IRenderer {
           }
         }
 
-        if (code !== NULL_CELL_CODE) {
-          this._model.lineLengths[y] = x + 1;
+        if (cell.code !== NULL_CELL_CODE) {
+          this._model.lineLengths[y] = 200; // vx + dvx;
         }
 
         // Nothing has changed, no updates needed
-        if (this._model.cells[i] === code &&
+        if (this._model.cells[i] === cell.code &&
             this._model.cells[i + RENDER_MODEL_BG_OFFSET] === this._cellColorResolver.result.bg &&
             this._model.cells[i + RENDER_MODEL_FG_OFFSET] === this._cellColorResolver.result.fg &&
             this._model.cells[i + RENDER_MODEL_EXT_OFFSET] === this._cellColorResolver.result.ext) {
+          vx += dvx;
+          x += dx;
           continue;
         }
 
         modelUpdated = true;
 
-        // Flag combined chars with a bit mask so they're easily identifiable
-        if (chars.length > 1) {
-          code |= COMBINED_CHAR_BIT_MASK;
-        }
-
         // Cache the results in the model
-        this._model.cells[i] = code;
+        this._model.cells[i] = cell.code;
         this._model.cells[i + RENDER_MODEL_BG_OFFSET] = this._cellColorResolver.result.bg;
         this._model.cells[i + RENDER_MODEL_FG_OFFSET] = this._cellColorResolver.result.fg;
         this._model.cells[i + RENDER_MODEL_EXT_OFFSET] = this._cellColorResolver.result.ext;
 
-        width = cell.width;
-        this._glyphRenderer.value!.updateCell(x, y, code, this._cellColorResolver.result.bg, this._cellColorResolver.result.fg, this._cellColorResolver.result.ext, chars, width, lastBg);
-
-        if (cell.isJoined) {
-          // Null out non-first cells
-          for (x++; x <= lastCharX; x++) {
-            j = ((y * terminal.cols) + x) * RENDER_MODEL_INDICIES_PER_CELL;
-            this._glyphRenderer.value!.updateCell(x, y, NULL_CELL_CODE, 0, 0, 0, NULL_CELL_CHAR, 0, 0);
-            this._model.cells[j] = NULL_CELL_CODE;
-            // Don't re-resolve the cell color since multi-colored ligature backgrounds are not
-            // supported
-            this._model.cells[j + RENDER_MODEL_BG_OFFSET] = this._cellColorResolver.result.bg;
-            this._model.cells[j + RENDER_MODEL_FG_OFFSET] = this._cellColorResolver.result.fg;
-            this._model.cells[j + RENDER_MODEL_EXT_OFFSET] = this._cellColorResolver.result.ext;
-          }
-          x--; // Go back to the previous update cell for next iteration
+        // after caching head at visual column vx
+        for (let t = 1; t < dvx; t++) {
+          const ti = ((y * terminal.cols) + (vx + t)) * RENDER_MODEL_INDICIES_PER_CELL;
+          this._model.cells[ti] = NULL_CELL_CODE;
+          this._model.cells[ti + RENDER_MODEL_BG_OFFSET] = this._cellColorResolver.result.bg;
+          this._model.cells[ti + RENDER_MODEL_FG_OFFSET] = this._cellColorResolver.result.fg;
+          this._model.cells[ti + RENDER_MODEL_EXT_OFFSET] = this._cellColorResolver.result.ext;
         }
+
+        this._glyphRenderer.value!.updateCell(vx, y, cell.code, this._cellColorResolver.result.bg, this._cellColorResolver.result.fg, this._cellColorResolver.result.ext, cell.chars, cell.visWidth, lastBg);
+
+        // if (y === 0) {
+        //   dumpModelRow(this._model, terminal.cols, y, `after row y=${y} build`);
+        //   console.log(`${JSON.stringify(cell)} at x=${x}, vx=${vx}, dx=${dx}, dvx=${dvx}`);
+        // }
+        vx += dvx;
+        x += dx;
       }
     }
     if (modelUpdated) {
@@ -629,4 +591,30 @@ export class WebglRenderer extends Disposable implements IRenderer {
 
 function clamp(value: number, max: number, min: number = 0): number {
   return Math.max(Math.min(value, max), min);
+}
+
+function dumpModelRow(model: RenderModel, cols: number, y: number, label=''): void {
+  // console.log(JSON.stringify(model));
+  // console.log(model);
+  const base = y * cols * RENDER_MODEL_INDICIES_PER_CELL;
+  const out: string[] = [];
+  for (let x = 0; x < cols; x++) {
+    const o = base + x * RENDER_MODEL_INDICIES_PER_CELL;
+    const code = model.cells[o];
+    if (code === 0) continue;
+    const combined = (code & COMBINED_CHAR_BIT_MASK) !== 0;
+    const raw = code & ~COMBINED_CHAR_BIT_MASK;
+    out.push(`${x}:${raw}${combined?'+C':''}`);
+  }
+  console.log(`[model y=${y}] ${label} => ${out.join(' ')}`);
+}
+
+function fnv1a(s: string): number {
+  let h = 0x811c9dc5;
+  const bytes = new TextEncoder().encode(s);
+  for (const b of bytes) {
+    h ^= b;
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
 }

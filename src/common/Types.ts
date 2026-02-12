@@ -261,8 +261,11 @@ export interface IBufferLine {
   getCodePoint(index: number): number;
   isCombined(index: number): boolean;
   getString(index: number): string;
+  getVisWidth(index: number): number;
+  getVisJoin(index: number): boolean;
 
   snapRightToHeadCell(col: number): number;
+  snapLeftToHeadCell(col: number): number;
   isNullCell(col: number): boolean;
   isTailCell(col: number): boolean;
   isEmptyCell(col: number): boolean;

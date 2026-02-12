@@ -126,7 +126,7 @@ export class DomRendererRowFactory {
         if (!isValidJoinRange) {
           skipJoinedCheckUntilX = range[1];
         } else {
-          cell.isJoined = true;
+          cell.charJoined = true;
 
           // We already know the exact start and end column of the joined range,
           // so we get the string and width representing it directly
@@ -188,7 +188,7 @@ export class DomRendererRowFactory {
           && isLinkHover === oldLinkHover
           && spacing === oldSpacing
           && !isCursorCell
-          && !cell.isJoined
+          && !cell.charJoined
           && !isDecorated
           && isValidJoinRange
         ) {
@@ -222,7 +222,7 @@ export class DomRendererRowFactory {
       oldSpacing = spacing;
       oldIsInSelection = isInSelection;
 
-      if (cell.isJoined) {
+      if (cell.charJoined) {
         // The DOM renderer colors the background of the cursor but for ligatures all cells are
         // joined. The workaround here is to show a cursor around the whole ligature so it shows up,
         // the cursor looks the same when on any character of the ligature though
@@ -448,7 +448,7 @@ export class DomRendererRowFactory {
       }
 
       // exclude conditions for cell merging - never merge these
-      if (!isCursorCell && !cell.isJoined && !isDecorated && isValidJoinRange) {
+      if (!isCursorCell && !cell.charJoined && !isDecorated && isValidJoinRange) {
         cellAmount++;
       } else {
         charElement.textContent = text;

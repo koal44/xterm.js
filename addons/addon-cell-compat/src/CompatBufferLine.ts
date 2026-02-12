@@ -136,7 +136,7 @@ export class CompatBufferLine implements IBufferLine {
     return AppCellData.visWidth(this._getContent(index));
   }
 
-  public isVisJoin(index: number): boolean {
+  public getVisJoin(index: number): boolean {
     return AppCellData.visJoin(this._getContent(index));
   }
 
@@ -227,12 +227,13 @@ export class CompatBufferLine implements IBufferLine {
     cell.extended.ext = ext ? ext.ext : 0;
     cell.extended.urlId = ext ? ext.urlId : 0;
 
-    cell.isJoined = false;
+    cell.charJoined = false;
 
     const content = this._data[i + Cell.CONTENT];
     const width = AppCellData.appWidth(content);
     cell.width = width;
     cell.visWidth = AppCellData.visWidth(content);
+    cell.visJoin = AppCellData.visJoin(content);
     const cp = AppCellData.codepoint(content);
     // cell.codepoint = cp;
     const isCombined = AppCellData.isCombined(content);
@@ -347,7 +348,7 @@ export class CompatBufferLine implements IBufferLine {
       nextMov > 2 ? 3 : nextMov,
       nextDel > 2 ? 3 : nextDel,
       abi.getVisWidth(props),
-      abi.getVisJoin(props)
+      AppCellData.visJoin(content),
     );
   }
 

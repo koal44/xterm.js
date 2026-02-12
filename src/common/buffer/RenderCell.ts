@@ -13,5 +13,6 @@ export class RenderCell extends AttributeData {
   public chars: string = '';
   public code: number = 0;
 
-  public isJoined: boolean = false;
+  public charJoined: boolean = false; // whether this cell was fused by characterJoiner service
+  public visJoin: boolean = false; // whether this cell should visually join to the prev cell (e.g. grapheme cluster)
 }

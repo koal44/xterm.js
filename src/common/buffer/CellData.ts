@@ -24,7 +24,7 @@ export class CellData extends AttributeData implements ICellData {
   private static readonly _widthShift      = 22;
 
   /** Extractors and packer for content field. */
-  public static width(content: number): number { return content >>> CellData._widthShift; }
+  public static width(content: number): number { return (content & CellData._widthMask) >>> CellData._widthShift; }
   public static hasContent(content: number): boolean { return !!(content & CellData._hasContentMask); }
   public static isCombined(content: number): boolean { return !!(content & CellData._isCombinedMask); }
   public static codepoint(content: number): number { return content & CellData._codepointMask; }

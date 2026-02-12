@@ -170,7 +170,8 @@ export class BufferLine implements IBufferLine {
     cell.extended.ext = ext ? ext.ext : 0;
     cell.extended.urlId = ext ? ext.urlId : 0;
 
-    cell.isJoined = false;
+    cell.charJoined = false;
+    cell.visJoin = false;
 
     const content = this._data[i + Cell.CONTENT];
     const width = CellData.width(content);
@@ -636,4 +637,11 @@ export class BufferLine implements IBufferLine {
     return this._nullCell;
   }
 
+  public getVisWidth(index: number): number {
+    return this.getWidth(index);
+  }
+
+  public getVisJoin(index: number): boolean {
+    return false;
+  }
 }
