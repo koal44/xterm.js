@@ -10,6 +10,8 @@ import { stringFromCodePoint } from 'common/input/TextDecoder';
 import { RenderCell } from 'common/buffer/RenderCell';
 import { DEFAULT_ATTR_DATA } from 'common/buffer/AttributeData';
 import * as abi from 'abi';
+import { UcWidthState, ucWidthStep } from 'vendor/uc-width/src';
+import { UcVerCompatProvider } from 'UcVerCompatProvider';
 
 /**
  * Buffer memory layout
@@ -738,4 +740,55 @@ export class CompatBufferLine implements IBufferLine {
     return this._nullCell;
   }
 
+  public snapToVisualLeft(col: number): number {
+    if (col <= 0) return 0;
+    if (col >= this.length) return this.length;
+    while (col > 0 && this.getVisJoin(col)) col--;
+    return col;
+  }
+
+  public snapToVisualRight(col: number): number {
+    if (col < 0) return 0;
+    if (col >= this.length) return this.length;
+    while (col + 1 < this.length && this.getVisJoin(col + 1)) col++;
+    return col;
+  }
+
+  private _setContent(index: number, content: number): void {
+    this._data[index * CELL_SIZE + Cell.CONTENT] = content;
+  }
+
+  private _repairCell = new AppCellData();
+  public repairVisualFromCol(col: number): void {
+    let idx = this.snapToVisualLeft(col - 1);
+    let state: UcWidthState | undefined;
+
+    for (; idx < this.length; idx++) {
+      if (this.isEmptyCell(idx)) {
+        if (this.isNullCell(idx)) state = undefined;
+        continue;
+      }
+
+      this.loadCell(idx, this._repairCell);
+
+      let first = true;
+      let cellVisJoin = false;
+      let cellVisWidth: 0|1|2 = 0;
+
+      for (const ch of this._repairCell.getChars()) {
+        const cp = ch.codePointAt(0)!;
+        const res = ucWidthStep(cp, UcVerCompatProvider.ucWidthOpts, state);
+
+        if (first) {
+          cellVisJoin = res.shouldJoin;
+          first = false;
+        }
+
+        cellVisWidth = res.clusterWidth;
+        state = res.state;
+      }
+
+      this._setContent(idx, AppCellData.patchVisual(this._getContent(idx), cellVisWidth, cellVisJoin));
+    }
+  }
 }

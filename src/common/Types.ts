@@ -270,6 +270,7 @@ export interface IBufferLine {
   isTailCell(col: number): boolean;
   isEmptyCell(col: number): boolean;
   countTrailingNullCells(): number;
+  repairVisualFromCol(col: number): void;
 }
 
 export interface IMarker extends IDisposable {

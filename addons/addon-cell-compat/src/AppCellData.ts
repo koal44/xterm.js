@@ -105,6 +105,14 @@ export class AppCellData extends AttributeData implements ICellData {
     return obj;
   }
 
+  public static patchVisual(content: number, visWidth: 0|1|2, visJoin: boolean): number {
+    content &= ~(AppCellData._visWidthMask | AppCellData._visJoinMask);
+    content |= visWidth << AppCellData._visWidthShift;
+    content |= +visJoin << AppCellData._visJoinShift;
+
+    return content >>> 0;
+  }
+
   /** Primitives from terminal buffer. */
   public content = 0;
   public fg = 0;

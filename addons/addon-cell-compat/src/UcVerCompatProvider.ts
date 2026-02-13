@@ -6,7 +6,7 @@ import { getAppWidth, getUc17State, getVisWidth, packProps, packUc17State, unpac
 export class UcVerCompatProvider implements IUnicodeVersionProvider {
   public readonly version = 'compat';
 
-  private _ucWidthOpts = ucWidthOptions({ vs15: 2 });
+  public static ucWidthOpts = ucWidthOptions({ vs15: 2 });
   private _table?: CompatTable;
 
   public setTable(t: CompatTable): void {
@@ -43,7 +43,7 @@ export class UcVerCompatProvider implements IUnicodeVersionProvider {
 
     const inState = unpackUc17State(prevUc17, prevVisWidth);
     const { shouldJoin: visJoin, clusterWidth: visWidth, state: nextState } =
-      ucWidthStep(cp, this._ucWidthOpts, inState);
+      ucWidthStep(cp, UcVerCompatProvider.ucWidthOpts, inState);
 
     const uc17State = packUc17State(nextState);
 

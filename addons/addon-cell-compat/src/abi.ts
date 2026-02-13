@@ -14,6 +14,7 @@
  */
 
 import { UcWidthState } from 'vendor/uc-width/src';
+import { binToStr, hexToStr } from 'vendor/uc-width/src/utils';
 
 // -----------------------------------------------
 // Property ABI: shifts/masks + accessors
@@ -166,4 +167,37 @@ function isGcb(x: number): x is Gcb {
 
 function isIncbState(x: number): x is IncbState {
   return x >= 0 && x <= 2;
+}
+
+// ---- debug formatting ----
+
+function uc17StateToString(packed15: number, prevVisWidth: 0|1|2): string {
+  const s = unpackUc17State(packed15, prevVisWidth);
+
+  const m = s.m;
+  const g = s.g;
+  const lp = g.lastProps;
+
+  return [
+    `clusterWidth=${s.clusterWidth}`,
+    `m{canNarrowVs15=${+m.canNarrowVs15} canWidenVs16=${+m.canWidenVs16}}`,
+    `g{started=${+g.started} riOdd=${+g.riOdd} epState=${g.epState} incbState=${g.incbState} lastProps{gcb=${lp.gcb} incb=${lp.incb} ep=${+lp.ep}}}`,
+  ].join(' ');
+}
+
+export function propsToString(p: number, prevVisWidth: 0|1|2 = 0): string {
+  const appJoin = getAppJoin(p);
+  const appWidth = getAppWidth(p);
+  const movWidth = getMovWidth(p);
+  const delWidth = getDelWidth(p);
+  const visJoin = getVisJoin(p);
+  const visWidth = getVisWidth(p);
+  const uc17 = getUc17State(p);
+  const uc17Str = uc17StateToString(uc17, prevVisWidth);
+
+  return [
+    `props=${hexToStr(p)} bits=${binToStr(p & 0x1FFFFFF, 25)}`, // only 25 used bits
+    `fields{appJoin=${+appJoin} appWidth=${appWidth} movWidth=${movWidth} delWidth=${delWidth} visJoin=${+visJoin} visWidth=${visWidth} uc17=${hexToStr(uc17)}}`,
+    `uc17(prevVisWidth=${prevVisWidth}) ${uc17Str}`
+  ].join(' | ');
 }

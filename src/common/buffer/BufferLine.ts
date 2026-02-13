@@ -644,4 +644,8 @@ export class BufferLine implements IBufferLine {
   public getVisJoin(index: number): boolean {
     return false;
   }
+
+  public repairVisualFromCol(col: number): void {
+    // no-op
+  }
 }

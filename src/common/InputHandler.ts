@@ -533,6 +533,10 @@ export class InputHandler extends Disposable implements IInputHandler {
       return;
     }
 
+    const repairRow = bufferRow;
+    const repairCol = this._activeBuffer.x;
+    const isRepairCellNull = repairRow.isNullCell(repairCol);
+
     this._dirtyRowTracker.markDirty(this._activeBuffer.y);
 
     // handle wide chars: reset start_cell-1 if we would overwrite the second cell of a wide char
@@ -560,6 +564,7 @@ export class InputHandler extends Disposable implements IInputHandler {
         }
       }
 
+      // console.log('code', code, 'pos', pos, 'precedingJoinState', precedingJoinState);
       const currentInfo = this._unicodeService.charProperties(code, precedingJoinState);
       chWidth = UnicodeService.extractWidth(currentInfo);
       const shouldJoin = UnicodeService.extractShouldJoin(currentInfo);
@@ -661,6 +666,10 @@ export class InputHandler extends Disposable implements IInputHandler {
       }
     }
 
+    if (this._parser.precedingJoinState === 0 && repairCol > 0 && !isRepairCellNull) {
+      console.log('repairing from col', repairCol);
+      repairRow.repairVisualFromCol(repairCol);
+    }
     this._parser.precedingJoinState = precedingJoinState;
 
     // handle wide chars: reset cell to the right if it is second cell of a wide char
