@@ -518,7 +518,7 @@ export class InputHandler extends Disposable implements IInputHandler {
 
   public print(data: Uint32Array, start: number, end: number): void {
     let code: number;
-    let chWidth: number;
+    let chWidth: 0|1|2;
     const charset = this._charsetService.charset;
     const screenReaderMode = this._optionsService.rawOptions.screenReaderMode;
     const cols = this._bufferService.cols;

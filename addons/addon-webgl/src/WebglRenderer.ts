@@ -16,7 +16,7 @@ import { ICoreService, IDecorationService, IOptionsService } from 'common/servic
 import { Terminal } from '@xterm/xterm';
 import { GlyphRenderer } from './GlyphRenderer';
 import { RectangleRenderer } from './RectangleRenderer';
-import { COMBINED_CHAR_BIT_MASK, RENDER_MODEL_BG_OFFSET, RENDER_MODEL_EXT_OFFSET, RENDER_MODEL_FG_OFFSET, RENDER_MODEL_INDICIES_PER_CELL, RenderModel } from './RenderModel';
+import { RENDER_MODEL_BG_OFFSET, RENDER_MODEL_EXT_OFFSET, RENDER_MODEL_FG_OFFSET, RENDER_MODEL_INDICIES_PER_CELL, RenderModel } from './RenderModel';
 import { IWebGL2RenderingContext, type ITextureAtlas } from './Types';
 import { LinkRenderLayer } from './renderLayer/LinkRenderLayer';
 import { IRenderLayer } from './renderLayer/Types';
@@ -591,22 +591,6 @@ export class WebglRenderer extends Disposable implements IRenderer {
 
 function clamp(value: number, max: number, min: number = 0): number {
   return Math.max(Math.min(value, max), min);
-}
-
-function dumpModelRow(model: RenderModel, cols: number, y: number, label=''): void {
-  // console.log(JSON.stringify(model));
-  // console.log(model);
-  const base = y * cols * RENDER_MODEL_INDICIES_PER_CELL;
-  const out: string[] = [];
-  for (let x = 0; x < cols; x++) {
-    const o = base + x * RENDER_MODEL_INDICIES_PER_CELL;
-    const code = model.cells[o];
-    if (code === 0) continue;
-    const combined = (code & COMBINED_CHAR_BIT_MASK) !== 0;
-    const raw = code & ~COMBINED_CHAR_BIT_MASK;
-    out.push(`${x}:${raw}${combined?'+C':''}`);
-  }
-  console.log(`[model y=${y}] ${label} => ${out.join(' ')}`);
 }
 
 function fnv1a(s: string): number {

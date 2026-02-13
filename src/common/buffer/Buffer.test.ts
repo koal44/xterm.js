@@ -22,7 +22,7 @@ function loadSnap(line: BufferLine, x: number, work = new CellData()): CellSnaps
   return [work.fg, work.getChars(), work.getWidth(), work.getCode()];
 }
 
-function setCellChar(buffer: Buffer, row: number, col: number, ch: string, width = 1, attrs = DEFAULT_ATTR_DATA): void {
+function setCellChar(buffer: Buffer, row: number, col: number, ch: string, width: 0|1|2 = 1, attrs = DEFAULT_ATTR_DATA): void {
   const line = buffer.lines.get(row)!;
   const cp = ch.codePointAt(0)!;
   line.setCellFromCodepoint(col, cp, width, attrs);

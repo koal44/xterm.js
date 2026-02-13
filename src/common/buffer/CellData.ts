@@ -24,16 +24,16 @@ export class CellData extends AttributeData implements ICellData {
   private static readonly _widthShift      = 22;
 
   /** Extractors and packer for content field. */
-  public static width(content: number): number { return (content & CellData._widthMask) >>> CellData._widthShift; }
+  public static width(content: number): 0|1|2 { return ((content & CellData._widthMask) >>> CellData._widthShift) as 0|1|2; }
   public static hasContent(content: number): boolean { return !!(content & CellData._hasContentMask); }
   public static isCombined(content: number): boolean { return !!(content & CellData._isCombinedMask); }
   public static codepoint(content: number): number { return content & CellData._codepointMask; }
-  public static packContent(codepoint: number, combined: boolean, width: number): number {
+  public static packContent(codepoint: number, combined: boolean, width: 0|1|2): number {
     return (combined ? CellData._isCombinedMask : codepoint) | (width << CellData._widthShift);
   }
 
   /** Helper for test function to create CellData from CharData. */
-  public static fromCharData(value: [fg: number, chars: string, width: number, _code?: number]): CellData {
+  public static fromCharData(value: [fg: number, chars: string, width: 0|1|2, _code?: number]): CellData {
     const [fg, chars, width] = value;
     const obj = new CellData();
     obj.fg = fg;
@@ -53,7 +53,7 @@ export class CellData extends AttributeData implements ICellData {
     return CellData.isCombined(this.content);
   }
   /** Width of the cell. */
-  public getWidth(): number {
+  public getWidth(): 0|1|2 {
     return CellData.width(this.content);
   }
   /** JS string of the content. */
@@ -76,7 +76,7 @@ export class CellData extends AttributeData implements ICellData {
       : CellData.codepoint(this.content);
   }
   /** Encode content from string and width. */
-  public setChars(chars: string, width: number): void {
+  public setChars(chars: string, width: 0|1|2): void {
     this.combinedData = '';
     let combined = false;
     // surrogates and combined strings need special treatment

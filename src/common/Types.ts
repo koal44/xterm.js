@@ -211,7 +211,7 @@ export interface ICellData extends IAttributeData {
   content: number;
   combinedData: string;
   isCombined(): boolean;
-  getWidth(): number;
+  getWidth(): 0|1|2;
   getChars(): string;
   getCode(): number;
 }
@@ -227,8 +227,8 @@ export interface IBufferLine {
   // setCell(index: number, cell: ICellData): void;
   setCellToNull(index: number, attr?: IAttributeData): void;
   setCellToTail(index: number, attr?: IAttributeData): void;
-  setCellFromCodepoint(index: number, codePoint: number, width: number, attr: IAttributeData, props?: number): void;
-  addCodepointToCell(index: number, codePoint: number, width: number, props?: number): void;
+  setCellFromCodepoint(index: number, codePoint: number, width: 0|1|2, attr: IAttributeData, props?: number): void;
+  addCodepointToCell(index: number, codePoint: number, width: 0|1|2, props?: number): void;
   // insertCells(pos: number, n: number, ch: ICellData): void;
   insertNullFill(pos: number, n: number, fillAttr: IAttributeData): void;
   // deleteCells(pos: number, n: number, fill: ICellData): void;

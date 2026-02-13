@@ -128,8 +128,8 @@ export class AppCellData extends AttributeData implements ICellData {
   }
 
   /** App width is the # of columns the backend app intends this cell to occupy. */
-  public getWidth(): number {
-    return AppCellData.appWidth(this.content);
+  public getWidth(): 0|1|2 {
+    return AppCellData.appWidth(this.content) as 0|1|2;
   }
 
   /** Mov width is the # of arrow key presses to move over this cell. */

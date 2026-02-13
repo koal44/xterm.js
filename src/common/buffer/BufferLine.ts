@@ -215,7 +215,7 @@ export class BufferLine implements IBufferLine {
    * Since the input handler see the incoming chars as UTF32 codepoints,
    * it gets an optimized access method.
    */
-  public setCellFromCodepoint(index: number, codePoint: number, width: number, attr: IAttributeData): void {
+  public setCellFromCodepoint(index: number, codePoint: number, width: 0|1|2, attr: IAttributeData): void {
     if (attr.bg & BgFlags.HAS_EXTENDED) {
       this._extendedAttrs[index] = attr.extended;
     } else if (this._extendedAttrs[index]) {
@@ -232,7 +232,7 @@ export class BufferLine implements IBufferLine {
    * onto a leading char. Since we already set the attrs
    * by the previous `setDataFromCodePoint` call, we can omit it here.
    */
-  public addCodepointToCell(index: number, codePoint: number, width: number): void {
+  public addCodepointToCell(index: number, codePoint: number, width: 0|1|2): void {
     const i = index * CELL_SIZE + Cell.CONTENT;
     // should not happen - we actually have no data in the cell yet
     if (this.isEmptyCell(index)) {

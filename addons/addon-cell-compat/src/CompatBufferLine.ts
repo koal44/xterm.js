@@ -281,7 +281,7 @@ export class CompatBufferLine implements IBufferLine {
    * Since the input handler see the incoming chars as UTF32 codepoints,
    * it gets an optimized access method.
    */
-  public setCellFromCodepoint(index: number, cp: number, width: number, attr: IAttributeData, props?: number): void {
+  public setCellFromCodepoint(index: number, cp: number, width: 0|1|2, attr: IAttributeData, props?: number): void {
     if (props === undefined) {
       throw new Error('props is required for setCellFromCodepoint in CompatBufferLine');
     }
@@ -315,7 +315,7 @@ export class CompatBufferLine implements IBufferLine {
    * onto a leading char. Since we already set the attrs
    * by the previous `setDataFromCodePoint` call, we can omit it here.
    */
-  public addCodepointToCell(index: number, codePoint: number, width: number, props?: number): void {
+  public addCodepointToCell(index: number, codePoint: number, width: 0|1|2, props?: number): void {
     if (props === undefined) {
       throw new Error('props is required for addCodepointToCell in CompatBufferLine');
     }

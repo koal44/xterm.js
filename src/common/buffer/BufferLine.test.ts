@@ -24,6 +24,20 @@ class TestBufferLine extends BufferLine {
     }
     return result;
   }
+
+  public toArrayView(): { chars: string, width: 0|1|2, code: number }[] {
+    const result: { chars: string, width: 0|1|2, code: number}[] = [];
+    const workCell = new CellData();
+    for (let i = 0; i < this.length; ++i) {
+      this.loadCell(i, workCell);
+      result.push({
+        chars: workCell.getChars(),
+        width: workCell.getWidth(),
+        code: workCell.getCode()
+      });
+    }
+    return result;
+  }
 }
 
 function snapCell(cell: CellData): CellSnapshot {
@@ -184,9 +198,12 @@ describe('BufferLine', function(): void {
     assert.equal(line.length, 10);
     assert.deepEqual(loadSnap(line, 0), [0, NULL_CELL_CHAR, NULL_CELL_WIDTH, NULL_CELL_CODE]);
     assert.equal(line.isWrapped, true);
-    line = new TestBufferLine(10, CellData.fromCharData([123, 'a', 456, 'a'.charCodeAt(0)]), true);
+    line = new TestBufferLine(10, undefined, true);
+    const attr = new AttributeData();
+    attr.fg = 123;
+    for (let i = 0; i < line.length; ++i) line.setCellFromCodepoint(i, 'a'.charCodeAt(0), 2, attr);
     assert.equal(line.length, 10);
-    assert.deepEqual(loadSnap(line, 0), [123, 'a', 456, 'a'.charCodeAt(0)]);
+    assert.deepEqual(loadSnap(line, 0), [123, 'a', 2, 'a'.charCodeAt(0)]);
     assert.equal(line.isWrapped, true);
   });
   it('insertCells', function(): void {
@@ -278,37 +295,49 @@ describe('BufferLine', function(): void {
     // CHAR_DATA_CODE_INDEX resembles current behavior in InputHandler.print
     // --> set code to the last charCodeAt value of the string
     // Note: needs to be fixed once the string pointer is in place
-    const line = new TestBufferLine(2, CellData.fromCharData([1, 'e\u0301', 0, '\u0301'.charCodeAt(0)]));
-    assert.deepEqual(line.toArray(), [[1, 'e\u0301', 0, '\u0301'.charCodeAt(0)], [1, 'e\u0301', 0, '\u0301'.charCodeAt(0)]]);
-    const line2 = new TestBufferLine(5, CellData.fromCharData([1, 'a', 0, '\u0301'.charCodeAt(0)]), true);
+    const line = new TestBufferLine(2, undefined);
+    for (let i = 0; i < line.length; ++i) line.setCell(i, CellData.fromCharData([1, 'e\u0301', 1, '\u0301'.charCodeAt(0)]));
+    assert.deepEqual(line.toArrayView(), [
+      { chars: 'e\u0301', width: 1, code: '\u0301'.charCodeAt(0) },
+      { chars: 'e\u0301', width: 1, code: '\u0301'.charCodeAt(0) }
+    ]);
+    const line2 = new TestBufferLine(5, undefined, true);
+    for (let i = 0; i < line2.length; ++i) line2.setCell(i, CellData.fromCharData([1, 'e\u0301', 0, '\u0301'.charCodeAt(0)]));
     line2.copyFrom(line);
     assert.deepEqual(line2.toArray(), line.toArray());
     const line3 = line.clone();
     assert.deepEqual(TestBufferLine.prototype.toArray.apply(line3), line.toArray());
   });
   describe('resize', function(): void {
+    const attrFill = new AttributeData();
+    attrFill.fg = 1;
     it('enlarge(false)', function(): void {
-      const line = new TestBufferLine(5, CellData.fromCharData([1, 'a', 0, 'a'.charCodeAt(0)]), false);
-      line.resize(10, CellData.fromCharData([1, 'a', 0, 'a'.charCodeAt(0)]));
-      assert.deepEqual(line.toArray(), (Array(10) as any).fill([1, 'a', 0, 'a'.charCodeAt(0)]));
+      const line = new TestBufferLine(5, attrFill, false);
+      line.fillToAscii('a', attrFill);
+      line.resize(10, CellData.fromCharData([1, 'a', 1]));
+      assert.deepEqual(line.toArrayView(), Array(10).fill({ chars: 'a', width: 1, code: 'a'.charCodeAt(0) }));
     });
     it('enlarge(true)', function(): void {
-      const line = new TestBufferLine(5, CellData.fromCharData([1, 'a', 0, 'a'.charCodeAt(0)]), false);
-      line.resize(10, CellData.fromCharData([1, 'a', 0, 'a'.charCodeAt(0)]));
-      assert.deepEqual(line.toArray(), (Array(10) as any).fill([1, 'a', 0, 'a'.charCodeAt(0)]));
+      const line = new TestBufferLine(5, attrFill, false);
+      line.fillToAscii('a', attrFill);
+      line.resize(10, CellData.fromCharData([1, 'a', 1]));
+      assert.deepEqual(line.toArrayView(), Array(10).fill({ chars: 'a', width: 1, code: 'a'.charCodeAt(0) }));
     });
     it('shrink(true) - should apply new size', function(): void {
-      const line = new TestBufferLine(10, CellData.fromCharData([1, 'a', 0, 'a'.charCodeAt(0)]), false);
-      line.resize(5, CellData.fromCharData([1, 'a', 0, 'a'.charCodeAt(0)]));
-      assert.deepEqual(line.toArray(), (Array(5) as any).fill([1, 'a', 0, 'a'.charCodeAt(0)]));
+      const line = new TestBufferLine(10, attrFill, false);
+      line.fillToAscii('a', attrFill);
+      line.resize(5, CellData.fromCharData([1, 'a', 0]));
+      assert.deepEqual(line.toArrayView(), Array(5).fill({ chars: 'a', width: 1, code: 'a'.charCodeAt(0) }));
     });
     it('shrink to 0 length', function(): void {
-      const line = new TestBufferLine(10, CellData.fromCharData([1, 'a', 0, 'a'.charCodeAt(0)]), false);
-      line.resize(0, CellData.fromCharData([1, 'a', 0, 'a'.charCodeAt(0)]));
-      assert.deepEqual(line.toArray(), (Array(0) as any).fill([1, 'a', 0, 'a'.charCodeAt(0)]));
+      const line = new TestBufferLine(10, attrFill, false);
+      line.fillToAscii('a', attrFill);
+      line.resize(0, CellData.fromCharData([1, 'a', 0]));
+      assert.equal(line.toArrayView().length, 0);
     });
     it('should remove combining data on replaced cells after shrinking then enlarging', () => {
-      const line = new TestBufferLine(10, CellData.fromCharData([1, 'a', 0, 'a'.charCodeAt(0)]), false);
+      const line = new TestBufferLine(10, attrFill, false);
+      line.fillToAscii('a', attrFill);
       line.setCell(2, CellData.fromCharData([0, '𓂀\u0301', 1]));
       line.setCell(9, CellData.fromCharData([0, '𓂀\u0301', 1]));
       assert.equal(line.translateToString(), 'aa𓂀\u0301aaaaaa𓂀\u0301');

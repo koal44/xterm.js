@@ -17,7 +17,7 @@ const INIT_ROWS = 24;
 // grab wcwidth from mock unicode service (hardcoded to V6)
 const wcwidth = (new MockUnicodeService()).wcwidth;
 
-function setCellChar(term: TestTerminal, row: number, col: number, ch: string, width = 1, attrs = DEFAULT_ATTR_DATA): void {
+function setCellChar(term: TestTerminal, row: number, col: number, ch: string, width: 0|1|2 = 1, attrs = DEFAULT_ATTR_DATA): void {
   const line = term.buffer.lines.get(row)!;
   const cp = ch.codePointAt(0)!;
   line.setCellFromCodepoint(col, cp, width, attrs);

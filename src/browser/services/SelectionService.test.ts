@@ -101,7 +101,7 @@ describe('SelectionService', () => {
     });
     it('should expand selection for wide characters', () => {
       // Wide characters use a special format
-      const data: [number, string, number, number][] = [
+      const data: [number, string, 0|1|2, number][] = [
         [0, '中', 2, '中'.charCodeAt(0)],
         [0, '', 0, 0],
         [0, '文', 2, '文'.charCodeAt(0)],
