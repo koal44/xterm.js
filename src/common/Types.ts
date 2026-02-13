@@ -271,6 +271,8 @@ export interface IBufferLine {
   isEmptyCell(col: number): boolean;
   countTrailingNullCells(): number;
   repairVisualFromCol(col: number): void;
+  visToAppIndex(visCol: number): [number, number];
+  appToVisIndex(appCol: number): number;
 }
 
 export interface IMarker extends IDisposable {

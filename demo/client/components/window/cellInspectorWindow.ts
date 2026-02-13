@@ -91,7 +91,7 @@ export class CellInspectorWindow extends BaseWindow implements IControlWindow {
         return;
       }
 
-      const x = coords[0] - 1;
+      let x = coords[0] - 1;
       const y = coords[1] - 1;
       const bufferY = terminal.buffer.active.viewportY + y;
 
@@ -100,6 +100,9 @@ export class CellInspectorWindow extends BaseWindow implements IControlWindow {
         this._clearDisplay();
         return;
       }
+
+      const lineRaw = (line as any)._line;
+      if (lineRaw) x = lineRaw.visToAppIndex(x)[0];
 
       const cellData = line.getCell(x, cell);
       if (!cellData) {

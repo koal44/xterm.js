@@ -405,6 +405,9 @@ export class SelectionService extends Disposable implements ISelectionService {
 
     // Convert viewport coords to buffer coords
     coords[1] += this._bufferService.buffer.ydisp;
+
+    // transform coords from vis to app
+    coords[0] = this._bufferService.buffer.lines.get(coords[1])?.visToAppIndex(coords[0])[0] ?? coords[0];
     return coords;
   }
 
@@ -717,10 +720,20 @@ export class SelectionService extends Disposable implements ISelectionService {
           this._bufferService.rows,
           false
         );
-        if (coordinates && coordinates[0] !== undefined && coordinates[1] !== undefined) {
-          const sequence = moveToCellSequence(coordinates[0] - 1, coordinates[1] - 1, this._bufferService, this._coreService.decPrivateModes.applicationCursorKeys);
-          this._coreService.triggerDataEvent(sequence, true);
+
+        if (!coordinates) return;
+
+        coordinates[0]--;
+        coordinates[1]--;
+
+        // Translate visual->app using the buffer line
+        const line = this._bufferService.buffer.lines.get(coordinates[1] + this._bufferService.buffer.ydisp);
+        if (line) {
+          coordinates[0] = line.visToAppIndex(coordinates[0])[0];
         }
+
+        const sequence = moveToCellSequence(coordinates[0], coordinates[1], this._bufferService, this._coreService.decPrivateModes.applicationCursorKeys);
+        this._coreService.triggerDataEvent(sequence, true);
       }
     } else {
       this._fireEventIfSelectionChanged();

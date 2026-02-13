@@ -1011,8 +1011,16 @@ function initImageAddonExposed(term: Terminal, addons: AddonCollection): void {
     // }
 
     const pos = (term as any)._core._mouseService!.getCoords(ev, (term as any)._core.screenElement!, term.cols, term.rows);
-    const x = pos[0] - 1;
+    let x = pos[0] - 1;
     const y = pos[1] - 1;
+
+    // convert visual x to buffer x
+    const bufferY = term.buffer.active.viewportY + y;
+    const line = (term as any).buffer.active.getLine(bufferY)?._line;
+    if (line) {
+      x = line.visToAppIndex(x)[0];
+    }
+
     const canvas = ev.shiftKey
       // ctrl+shift+click: get single tile
       ? addons.image.instance.extractTileAtBufferCell(x, term.buffer.active.viewportY + y)

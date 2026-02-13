@@ -384,6 +384,14 @@ export class Linkifier extends Disposable implements ILinkifier2 {
       return;
     }
 
+    // coords are 1-based
+    const bufferY0 = (coords[1] - 1) + this._bufferService.buffer.ydisp;
+    const line = this._bufferService.buffer.lines.get(bufferY0);
+    if (line) {
+      const visCol0 = coords[0] - 1;
+      coords[0] = line.visToAppIndex(visCol0)[0] + 1; // back to 1-based
+    }
+
     return { x: coords[0], y: coords[1] + this._bufferService.buffer.ydisp };
   }
 

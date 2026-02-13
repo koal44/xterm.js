@@ -3,6 +3,8 @@
  * @license MIT
  */
 
+// TODO: Move cluster visWidth ownership to the visual root to avoid end-scan/tail skipping.
+
 import { IAttributeData, IBufferLine, ICellData, IExtendedAttrs } from 'common/Types';
 import { AppCellData } from './AppCellData';
 import { Attributes, BgFlags, NULL_CELL_CHAR, NULL_CELL_CODE, NULL_CELL_WIDTH, TAIL_CELL_CODE, TAIL_CELL_WIDTH, WHITESPACE_CELL_CHAR, WHITESPACE_CELL_WIDTH } from 'common/buffer/Constants';
@@ -791,4 +793,55 @@ export class CompatBufferLine implements IBufferLine {
       this._setContent(idx, AppCellData.patchVisual(this._getContent(idx), cellVisWidth, cellVisJoin));
     }
   }
+
+  public visToAppIndex(visCol: number): [number, number] {
+    if (visCol < 0) return [0, 0]; // shouldn't happen if caller is sane
+
+    let visStart = 0;
+    const n = this.length;
+
+    for (let root = 0; root < n; root++) {
+      if (this.getVisJoin(root)) continue; // roots only
+
+      const w = this._clusterVisWidth(root);
+
+      // cluster owns [visStart, visStart + w - 1]
+      if (visCol < visStart + w) {
+        const end = this._clusterEnd(root);
+        return [root, end];
+      }
+
+      visStart += w;
+    }
+
+    // overshot, return EOL
+    return [n, n];
+  }
+
+  public appToVisIndex(appCol: number): number {
+    const root = this.snapToVisualLeft(appCol);
+
+    let visStart = 0;
+    for (let i = 0; i < root; i++) {
+      if (this.getVisJoin(i)) continue;
+      visStart += this._clusterVisWidth(i);
+    }
+
+    return visStart;
+  }
+
+  private _clusterEnd(col: number): number {
+    let end = col;
+    while (end + 1 < this.length && this.getVisJoin(end + 1)) end++;
+    return end;
+  }
+
+  private _clusterVisWidth(col: number): number {
+    let end = this._clusterEnd(col);
+    if (this.isTailCell(end) && end > col) {
+      end--;
+    }
+    return this.getVisWidth(end);
+  }
+
 }

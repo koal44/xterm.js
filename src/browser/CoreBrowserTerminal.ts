@@ -702,6 +702,12 @@ export class CoreBrowserTerminal extends CoreTerminal implements ITerminal {
         return false;
       }
 
+      // Translate visual->app column for mouse reporting
+      const line = self._bufferService.buffer.lines.get(pos.row + self._bufferService.buffer.ydisp);
+      if (line) {
+        pos.col = line.visToAppIndex(pos.col)[0];
+      }
+
       return self.coreMouseService.triggerMouseEvent({
         col: pos.col,
         row: pos.row,

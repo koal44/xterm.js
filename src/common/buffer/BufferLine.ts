@@ -648,4 +648,12 @@ export class BufferLine implements IBufferLine {
   public repairVisualFromCol(col: number): void {
     // no-op
   }
+
+  public visToAppIndex(visCol: number): [number, number] {
+    return [visCol, visCol];
+  }
+
+  public appToVisIndex(appCol: number): number {
+    return appCol;
+  }
 }
