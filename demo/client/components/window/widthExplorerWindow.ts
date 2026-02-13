@@ -462,7 +462,16 @@ export class WidthExplorerWindow extends BaseWindow {
 
     // CellCompat
     root.appendChild(document.createElement('hr'));
-    addRow(root, 'cell compat addon: ',
+    addRow(root, 'compat addon:');
+
+    const uc17Cb = mkCheckbox('uc17', 'Unicode 17 visual overlay', true, v => {
+      if (!this._cellCompat) return;
+      this._cellCompat.setUseUc17(v);
+      // if (this._profile) this._inject(this._profile.keys.clearScreen);
+    });
+    uc17Cb.input.disabled = true;
+
+    addRow(root, '',
       mkCheckbox('enable', 'Enable CellCompatAddon', false, v => {
         const enabled = v;
         if (!this._cellCompat) {
@@ -483,7 +492,9 @@ export class WidthExplorerWindow extends BaseWindow {
         if (this._profile) {
           this._inject(this._profile?.keys.clearScreen);
         }
+        uc17Cb.input.disabled = !enabled;
       }).label,
+      uc17Cb.label,
     );
 
 

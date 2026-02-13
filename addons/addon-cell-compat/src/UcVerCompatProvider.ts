@@ -5,6 +5,7 @@ import { getAppWidth, getUc17State, getVisWidth, packProps, packUc17State, unpac
 
 export class UcVerCompatProvider implements IUnicodeVersionProvider {
   public readonly version = 'compat';
+  public useUc17 = true;
 
   public static ucWidthOpts = ucWidthOptions({ vs15: 2 });
   private _table?: CompatTable;
@@ -37,15 +38,21 @@ export class UcVerCompatProvider implements IUnicodeVersionProvider {
       }
     }
 
-    // --- Visual (UC17 / uc-width model) ---
-    const prevVisWidth = preceding ? getVisWidth(preceding) : 0;
-    const prevUc17 = preceding ? getUc17State(preceding) : 0;
+    // --- Visual layer ---
+    let visJoin = false;
+    let visWidth: 0|1|2 = appWidth;
+    let uc17State = 0;
 
-    const inState = unpackUc17State(prevUc17, prevVisWidth);
-    const { shouldJoin: visJoin, clusterWidth: visWidth, state: nextState } =
-      ucWidthStep(cp, UcVerCompatProvider.ucWidthOpts, inState);
+    if (this.useUc17) {
+      const prevVisWidth = preceding ? getVisWidth(preceding) : 0;
+      const prevUc17 = preceding ? getUc17State(preceding) : 0;
+      const inState = unpackUc17State(prevUc17, prevVisWidth);
 
-    const uc17State = packUc17State(nextState);
+      const step = ucWidthStep(cp, UcVerCompatProvider.ucWidthOpts, inState);
+      visJoin = step.shouldJoin;
+      visWidth = step.clusterWidth;
+      uc17State = packUc17State(step.state);
+    }
 
     return packProps({
       appJoin,

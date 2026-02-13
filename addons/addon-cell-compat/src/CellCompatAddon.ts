@@ -43,6 +43,11 @@ export class CellCompatAddon implements ITerminalAddon {
     setLineCtor(term, enable ? CompatBufferLine : BufferLine);
     term.reset();
   }
+
+  public setUseUc17(enable: boolean): void {
+    if (!this._provider) throw new Error('CellCompatAddon not activated');
+    this._provider.useUc17 = enable;
+  }
 }
 
 type LineCtor = Parameters<BufferSet['setLineCtor']>[0];
