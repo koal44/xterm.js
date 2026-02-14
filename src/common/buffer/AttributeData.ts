@@ -180,7 +180,6 @@ export class AttributeData implements IAttributeData {
       return `unknown(${c})`;
     };
 
-    // --- Build attrs list (same ordering/semantics as your original) ---
     const attrs: string[] = [];
     if (this.isBold()) attrs.push('bold (1)');
     if (this.isDim()) attrs.push('dim (2)');
@@ -206,8 +205,6 @@ export class AttributeData implements IAttributeData {
            `bg: ${formatMainColor('bg')} ` +
            `attrs: ${attrs.length ? attrs.join(', ') : '(none)'}`;
   }
-
-
 }
 
 /**

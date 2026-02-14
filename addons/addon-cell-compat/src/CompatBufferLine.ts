@@ -761,8 +761,11 @@ export class CompatBufferLine implements IBufferLine {
     this._data[index * CELL_SIZE + Cell.CONTENT] = content;
   }
 
+  public static useUc17VisualOverlay = true; // set by addon
   private _repairCell = new AppCellData();
   public repairVisualFromCol(col: number): void {
+    if (!CompatBufferLine.useUc17VisualOverlay) return;
+
     let idx = this.snapToVisualLeft(col - 1);
     let state: UcWidthState | undefined;
 
@@ -871,20 +874,6 @@ export class CompatBufferLine implements IBufferLine {
     }
 
     return { start, end, text, cells };
-  }
-
-  public burst2(op: 'mov'|'del', dir: 'left'|'right', x: number): number {
-    if (x < 0 || x >= this.length) return 0;
-
-    const dx = (dir === 'left') ? -1 : 1;
-    x += dx;
-
-    let burstCount = 1;
-    while (x >= 0 && x < this.length && (this.getVisJoin(x) || this.isTailCell(x))) {
-      x += (dir === 'left') ? -1 : 1;
-      burstCount += op === 'mov' ? this.getMovWidth(x) : this.getDelWidth(x);
-    }
-    return burstCount;
   }
 
   public burst(op: 'mov'|'del', dir: 'left'|'right', x: number): number {
