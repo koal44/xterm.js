@@ -222,6 +222,7 @@ export class WidthExplorerWindow extends BaseWindow {
   private _logFlushScheduled = false;
   private _logFlushTimer: number | undefined;
 
+  private _cellCompatEnabled = false;
   private _cellCompat: CellCompatAddon | undefined;
   private _prevUcProvider: string | undefined;
 
@@ -473,13 +474,14 @@ export class WidthExplorerWindow extends BaseWindow {
 
     addRow(root, '',
       mkCheckbox('enable', 'Enable CellCompatAddon', false, v => {
-        const enabled = v;
+        // if (!this._profile) { this._appendLog('[dev] no profile\n'); return; }
+        this._cellCompatEnabled = v;
         if (!this._cellCompat) {
           this._cellCompat = new CellCompatAddon();
           this._terminal.loadAddon(this._cellCompat);
         }
 
-        if (enabled) {
+        if (this._cellCompatEnabled) {
           this._cellCompat.setEnable(true, this._terminal);
           this._prevUcProvider = this._terminal.unicode.activeVersion;
           this._cellCompat.loadCompatTable(this._profile?.compatPreset ?? DEFAULT_MEASURED_TABLE);
@@ -492,7 +494,7 @@ export class WidthExplorerWindow extends BaseWindow {
         if (this._profile) {
           this._inject(this._profile?.keys.clearScreen);
         }
-        uc17Cb.input.disabled = !enabled;
+        uc17Cb.input.disabled = !this._cellCompatEnabled;
       }).label,
       uc17Cb.label,
     );
@@ -523,6 +525,10 @@ export class WidthExplorerWindow extends BaseWindow {
     this._appendLog(`[dev] app profile = ${this._profile.id}\n`);
     this._store = new BrowserStorage(this._profile.tableName);
     this._workingTable = new MeasuredTable(this._profile.tableName);
+
+    if (this._cellCompatEnabled && this._cellCompat) {
+      this._cellCompat.loadCompatTable(this._profile.compatPreset);
+    }
   }
 
   private async _initProfile(): Promise<void> {

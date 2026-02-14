@@ -464,7 +464,7 @@ export class WebglRenderer extends Disposable implements IRenderer {
         }
 
         if (cell.code !== NULL_CELL_CODE) {
-          this._model.lineLengths[y] = 200; // vx + dvx;
+          this._model.lineLengths[y] = Math.min(vx + dx, terminal.cols); // vx + dx; // + dvx;
         }
 
         // Nothing has changed, no updates needed
