@@ -129,6 +129,85 @@ export class AttributeData implements IAttributeData {
   public getUnderlineVariantOffset(): number {
     return this.extended.underlineVariantOffset;
   }
+
+  public inspect(): string {
+    const pad6 = (s: string): string => ('000000' + s).slice(-6); // no padStart
+    const hex6 = (n: number): string => pad6(n.toString(16).toUpperCase());
+    const rgb = (c: number): { r: number, g: number, b: number } =>
+      ({ r: (c >>> 16) & 0xFF, g: (c >>> 8) & 0xFF, b: c & 0xFF });
+
+    const formatMainColor = (which: 'fg' | 'bg'): string => {
+      const fg = which === 'fg';
+
+      const isDefault = fg ? this.isFgDefault() : this.isBgDefault();
+      if (isDefault) return fg ? 'default (39)' : 'default (49)';
+
+      const c = fg ? this.getFgColor() : this.getBgColor();
+
+      const isPalette = fg ? this.isFgPalette() : this.isBgPalette();
+      if (isPalette) {
+        const lowBase = fg ? 30 : 40;
+        const hiBase  = fg ? 90 : 100;
+        const ext     = fg ? 38 : 48;
+
+        const sgr = (c < 8)
+          ? String(lowBase + c)
+          : (c < 16)
+            ? String(hiBase + (c - 8))
+            : `${ext};5;${c}`;
+
+        return `palette(${c}) (${sgr})`;
+      }
+
+      const isRGB = fg ? this.isFgRGB() : this.isBgRGB();
+      if (isRGB) {
+        const { r, g, b } = rgb(c);
+        return `#${hex6(c)} (${fg ? 38 : 48};2;${r};${g};${b})`;
+      }
+
+      return `unknown(${c})`;
+    };
+
+    const underlineStyleName = (s: UnderlineStyle): string =>
+      (['none', 'single', 'double', 'curly', 'dotted', 'dashed'] as const)[s] ?? 'unknown';
+
+    const formatUnderlineColor = (c: number): string => {
+      if (this.isUnderlineColorPalette()) return `palette(${c}) (58;5;${c})`;
+      if (this.isUnderlineColorRGB()) {
+        const { r, g, b } = rgb(c);
+        return `#${hex6(c)} (58;2;${r};${g};${b})`;
+      }
+      return `unknown(${c})`;
+    };
+
+    // --- Build attrs list (same ordering/semantics as your original) ---
+    const attrs: string[] = [];
+    if (this.isBold()) attrs.push('bold (1)');
+    if (this.isDim()) attrs.push('dim (2)');
+    if (this.isItalic()) attrs.push('italic (3)');
+
+    if (this.isUnderline()) {
+      const style = this.getUnderlineStyle();
+      attrs.push(`underline ${underlineStyleName(style)} (4:${style})`);
+
+      if (!this.isUnderlineColorDefault()) {
+        const c = this.getUnderlineColor();
+        attrs.push(`underline color: ${formatUnderlineColor(c)}`);
+      }
+    }
+
+    if (this.isBlink()) attrs.push('blink (5)');
+    if (this.isInverse()) attrs.push('inverse (7)');
+    if (this.isInvisible()) attrs.push('invisible (8)');
+    if (this.isStrikethrough()) attrs.push('strikethrough (9)');
+    if (this.isOverline()) attrs.push('overline (53)');
+
+    return `fg: ${formatMainColor('fg')} ` +
+           `bg: ${formatMainColor('bg')} ` +
+           `attrs: ${attrs.length ? attrs.join(', ') : '(none)'}`;
+  }
+
+
 }
 
 /**

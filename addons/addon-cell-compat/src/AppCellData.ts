@@ -174,4 +174,40 @@ export class AppCellData extends AttributeData implements ICellData {
       ? this.combinedData.charCodeAt(this.combinedData.length - 1)
       : AppCellData.codepoint(this.content);
   }
+
+  public override inspect(): string {
+    const pad4 = (s: string): string => ('0000' + s).slice(-4);
+
+    const codepoints = (s: string): string => {
+      if (!s) return '(none)';
+      const out: string[] = [];
+      for (const ch of s) {
+        const cp = ch.codePointAt(0)!;
+        out.push(`U+${pad4(cp.toString(16).toUpperCase())}`);
+      }
+      return out.join(' ');
+    };
+
+    const chars = this.getChars();
+    const charsStr = chars ? `"${chars}"` : '(empty)';
+
+    // Width metrics
+    const wLine =
+      `width: app=${this.getWidth()}` +
+      ` mov=${this.getMovWidth()}` +
+      ` del=${this.getDelWidth()}` +
+      ` vis=${this.getVisWidth()}`;
+
+    const jLine =
+      `visJoin=${this.isVisJoin() ? 1 : 0}`;
+
+    return (
+      `chars: ${charsStr}\n` +
+      `codepoint: ${codepoints(chars)}\n` +
+      `${wLine}\n` +
+      `${jLine}\n` +
+      super.inspect()
+    );
+  }
+
 }

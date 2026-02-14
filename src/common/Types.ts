@@ -204,6 +204,8 @@ export interface IAttributeData {
   isUnderlineColorDefault(): boolean;
   getUnderlineStyle(): number;
   getUnderlineVariantOffset(): number;
+
+  inspect(): string;
 }
 
 /** Cell data */
@@ -273,6 +275,7 @@ export interface IBufferLine {
   repairVisualFromCol(col: number): void;
   visToAppIndex(visCol: number): [number, number];
   appToVisIndex(appCol: number): number;
+  inspectVisual(col: number): {start: number, end: number, text: string, cells: string[] };
 }
 
 export interface IMarker extends IDisposable {

@@ -656,4 +656,21 @@ export class BufferLine implements IBufferLine {
   public appToVisIndex(appCol: number): number {
     return appCol;
   }
+
+  public inspectVisual(col: number): { start: number, end: number, text: string, cells: string[] } {
+    if (col < 0) col = 0;
+    if (col >= this.length) col = this.length - 1;
+
+    const tmp = new CellData();
+    this.loadCell(col, tmp);
+
+    const text = tmp.getChars();
+    return {
+      start: col,
+      end: col,
+      text,
+      cells: [this.isTailCell(col) ? '<tail>' : tmp.inspect()]
+    };
+  }
+
 }

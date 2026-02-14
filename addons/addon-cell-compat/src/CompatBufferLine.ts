@@ -844,4 +844,32 @@ export class CompatBufferLine implements IBufferLine {
     return this.getVisWidth(end);
   }
 
+  public inspectVisual(col: number): { start: number, end: number, text: string, cells: string[] } {
+    if (col < 0) col = 0;
+    if (col >= this.length) col = this.length - 1;
+
+    const start = col;
+    const end = this._clusterEnd(col);
+
+    const tmp = new AppCellData();
+    const cells: string[] = [];
+
+    let text = '';
+    for (let i = start; i <= end; i++) {
+      if (this.isTailCell(i)) {
+        cells.push('<tail>');
+        continue;
+      }
+
+      this.loadCell(i, tmp);
+
+      const ch = tmp.getChars();
+      if (ch) text += ch;
+
+      cells.push(tmp.inspect());
+    }
+
+    return { start, end, text, cells };
+  }
+
 }

@@ -112,4 +112,29 @@ export class CellData extends AttributeData implements ICellData {
       this.content = CellData.packContent(0, true, width);
     }
   }
+
+  public override inspect(): string {
+    const pad4 = (s: string): string => ('0000' + s).slice(-4);
+
+    const formatCodepoints = (s: string): string => {
+      if (!s || s.length === 0) return '(none)';
+      const cps: string[] = [];
+      for (const ch of s) {
+        const cp = ch.codePointAt(0)!;
+        cps.push(`U+${pad4(cp.toString(16).toUpperCase())}`);
+      }
+      return cps.join(' ');
+    };
+
+    const chars = this.getChars();
+    const charsStr = chars.length > 0 ? `"${chars}"` : '(empty)';
+
+    return (
+      `chars: ${charsStr}\n` +
+      `codepoint: ${formatCodepoints(chars)}\n` +
+      `width: ${this.getWidth()}\n` +
+      super.inspect()
+    );
+  }
+
 }
