@@ -32,6 +32,7 @@ import { ignoreUnprintablesInTable } from 'components/window/widthExplorer/unpri
 import { decodeData, escapeForLog, formatCodePoints, hexToStr } from 'components/window/widthExplorer/stringUtil';
 import { CircularList } from 'components/window/widthExplorer/circularList';
 import { bashCompatRanges, fishCompatRanges, pwshCompatRanges, zshCompatRanges } from 'components/window/widthExplorer/compatTablePresets';
+import { sendKey } from 'components/window/widthExplorer/keyboard';
 
 // choose ascii single char to avoid app splitting suffix across messages
 const TEST_PREFIX = '«';
@@ -262,7 +263,7 @@ export class WidthExplorerWindow extends BaseWindow {
     );
     this._silentCb = silentInput;
     addRow(root, 'log: ',
-      mkButton('↻', 'Clear the log output', () => this._clearLog()),
+      mkButton('⌧', 'Clear the log output', () => this._clearLog()),
       silentLabel,
       mkCheckbox('zwj ', 'render ZWJ as {zwj} in trace?', this._showZwj, v => { this._showZwj = v; }).label,
     );
@@ -274,22 +275,29 @@ export class WidthExplorerWindow extends BaseWindow {
     const delN = mkNumericUpDown('DEL repeat count', 1, 64, 1, 1);
     delN.style.width = '30px';
     addRow(root, '',
-      mkButton('⌧', 'Clear screen & redraw current line', () => {
+      mkButton('⎚', 'Clear screen & redraw current line', () => {
         this._inject(this._profile?.keys.clearScreen);
       }),
-      mkButton('⌫', 'Clear the current line', () => {
+      mkButton('⌧', 'Clear the current line', () => {
         if (this._profile?.clearLineNeedsEnd) this._inject(this._profile?.keys.end);
         this._inject(this._profile?.keys.clearLine);
       }),
-      mkButton('←', 'Left', () => this._inject(this._profile?.keys.left)),
-      mkButton('→', 'Right', () => this._inject(this._profile?.keys.right)),
-      mkButton('⇤', 'Home', () => this._inject(this._profile?.keys.home)),
-      mkButton('⇥', 'End', () => this._inject(this._profile?.keys.end)),
-      mkButton('DEL×N', 'Send DEL × N', () => {
-        const n = Math.max(1, Math.min(64, +delN.value));
-        this._inject(this._profile?.keys.del.repeat(n));
-      }),
-      delN,
+      mkButton('←', 'Left', () => sendKey(this._terminal, 'left')),
+      mkButton('→', 'Right', () => sendKey(this._terminal, 'right')),
+      mkButton('⇤', 'Home', () => sendKey(this._terminal, 'home')),
+      mkButton('⇥', 'End', () => sendKey(this._terminal, 'end')),
+      mkButton('⌫', 'Backspace', () => sendKey(this._terminal, 'backspace')),
+      mkButton('⌦', 'Delete', () => sendKey(this._terminal, 'delete')),
+
+      // mkButton('←', 'Left', () => this._inject(this._profile?.keys.left)),
+      // mkButton('→', 'Right', () => this._inject(this._profile?.keys.right)),
+      // mkButton('⇤', 'Home', () => this._inject(this._profile?.keys.home)),
+      // mkButton('⇥', 'End', () => this._inject(this._profile?.keys.end)),
+      // mkButton('DEL×N', 'Send DEL × N', () => {
+      //   const n = Math.max(1, Math.min(64, +delN.value));
+      //   this._inject(this._profile?.keys.del.repeat(n));
+      // }),
+      // delN,
     );
 
     addRow(root, '',

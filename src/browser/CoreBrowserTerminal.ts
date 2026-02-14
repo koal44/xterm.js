@@ -1143,12 +1143,12 @@ export class CoreBrowserTerminal extends CoreTerminal implements ITerminal {
       let op: 'mov' | 'del' | undefined;
       let dir: 'left' | 'right' | undefined;
 
-      switch (event.keyCode) {
-        case 37: op = 'mov'; dir = 'left'; break;   // left arrow
-        case 39: op = 'mov'; dir = 'right'; break;  // right arrow
-        case 8:  op = 'del'; dir = 'left'; break;   // backspace (backward delete)
-        case 46: op = 'del'; dir = 'right'; break;  // delete (forward delete)
-        case 0:
+      switch (event.key) {
+        case 'ArrowLeft':  op='mov'; dir='left'; break;
+        case 'ArrowRight': op='mov'; dir='right'; break;
+        case 'Backspace':  op='del'; dir='left'; break;
+        case 'Delete':     op='del'; dir='right'; break;
+        default:
           // iOS/macOS UIKeyInput*Arrow fallback
           if (event.key === 'UIKeyInputLeftArrow') { op = 'mov'; dir = 'left'; }
           else if (event.key === 'UIKeyInputRightArrow') { op = 'mov'; dir = 'right'; }

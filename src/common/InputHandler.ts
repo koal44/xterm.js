@@ -667,7 +667,6 @@ export class InputHandler extends Disposable implements IInputHandler {
     }
 
     if (this._parser.precedingJoinState === 0 && repairCol > 0 && !isRepairCellNull) {
-      console.log('repairing from col', repairCol);
       repairRow.repairVisualFromCol(repairCol);
     }
     this._parser.precedingJoinState = precedingJoinState;
