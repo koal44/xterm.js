@@ -1138,9 +1138,37 @@ export class CoreBrowserTerminal extends CoreTerminal implements ITerminal {
       this.textarea!.value = '';
     }
 
-    this._onKey.fire({ key: result.key, domEvent: event });
+    let key = result.key;
+    if (!event.ctrlKey && !event.altKey && !event.metaKey) {
+      let op: 'mov' | 'del' | undefined;
+      let dir: 'left' | 'right' | undefined;
+
+      switch (event.keyCode) {
+        case 37: op = 'mov'; dir = 'left'; break;   // left arrow
+        case 39: op = 'mov'; dir = 'right'; break;  // right arrow
+        case 8:  op = 'del'; dir = 'left'; break;   // backspace (backward delete)
+        case 46: op = 'del'; dir = 'right'; break;  // delete (forward delete)
+        case 0:
+          // iOS/macOS UIKeyInput*Arrow fallback
+          if (event.key === 'UIKeyInputLeftArrow') { op = 'mov'; dir = 'left'; }
+          else if (event.key === 'UIKeyInputRightArrow') { op = 'mov'; dir = 'right'; }
+          break;
+      }
+
+      if (op && dir) {
+        const line = this.buffer.lines.get(this.buffer.ybase + this.buffer.y);
+        if (line) {
+          const b = line.burst(op, dir, this.buffer.x);
+          if (b > 1) {
+            key = key.repeat(b);
+          }
+        }
+      }
+    }
+
+    this._onKey.fire({ key, domEvent: event });
     this._showCursor();
-    this.coreService.triggerDataEvent(result.key, true);
+    this.coreService.triggerDataEvent(key, true);
 
     // Cancel events when not in screen reader mode so events don't get bubbled up and handled by
     // other listeners. When screen reader mode is enabled, we don't cancel them (unless ctrl or alt

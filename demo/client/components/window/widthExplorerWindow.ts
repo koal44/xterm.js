@@ -472,6 +472,12 @@ export class WidthExplorerWindow extends BaseWindow {
     });
     uc17Cb.input.disabled = true;
 
+    const atomicCb = mkCheckbox('atomic', 'Atomic editing of graphemes using burst keys', true, v => {
+      if (!this._cellCompat) return;
+      this._cellCompat.setAtomic(v, this._terminal);
+    });
+    atomicCb.input.disabled = true;
+
     addRow(root, '',
       mkCheckbox('enable', 'Enable CellCompatAddon', false, v => {
         // if (!this._profile) { this._appendLog('[dev] no profile\n'); return; }
@@ -495,8 +501,10 @@ export class WidthExplorerWindow extends BaseWindow {
           this._inject(this._profile?.keys.clearScreen);
         }
         uc17Cb.input.disabled = !this._cellCompatEnabled;
+        atomicCb.input.disabled = !this._cellCompatEnabled;
       }).label,
       uc17Cb.label,
+      atomicCb.label,
     );
 
 

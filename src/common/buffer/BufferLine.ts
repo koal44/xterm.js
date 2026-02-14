@@ -673,4 +673,7 @@ export class BufferLine implements IBufferLine {
     };
   }
 
+  public burst(op: 'mov'|'del', dir: 'left'|'right', x: number): number {
+    return 1;
+  }
 }

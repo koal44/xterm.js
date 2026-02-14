@@ -32,7 +32,7 @@ import { UcVerCompatProvider } from 'UcVerCompatProvider';
  *  | RSV | visJoin | visWidth | delWidth | movWidth | appWidth | comb | codepoint |
  *  +-----+---------+----------+----------+----------+----------+------+-----------+
  *
- * - visJoin: whether this cell is the root of a visual cluster (e.g. UC17 grapheme root)
+ * - visJoin: whether this cell is not the root of a visual cluster (e.g. UC17 grapheme root)
  * - visWidth: visual width used by the renderer (0..2; 3 reserved)
  * - delWidth: number of DEL keystrokes to delete this cell (0..2; 3 => sideloaded)
  * - movWidth: number of cursor moves to traverse this cell (0..2; 3 => sideloaded)
@@ -82,6 +82,7 @@ export class CompatBufferLine implements IBufferLine {
   public length: number;
   private _sideloadMovWidths: {[index: number]: number} = {};
   private _sideloadDelWidths: {[index: number]: number} = {};
+  public static disableAtomicEditing = false; // for demo!
 
   constructor(cols: number, nullFillAttr?: IAttributeData, public isWrapped: boolean = false) {
     this._data = new Uint32Array(cols * CELL_SIZE);
@@ -870,6 +871,60 @@ export class CompatBufferLine implements IBufferLine {
     }
 
     return { start, end, text, cells };
+  }
+
+  public burst2(op: 'mov'|'del', dir: 'left'|'right', x: number): number {
+    if (x < 0 || x >= this.length) return 0;
+
+    const dx = (dir === 'left') ? -1 : 1;
+    x += dx;
+
+    let burstCount = 1;
+    while (x >= 0 && x < this.length && (this.getVisJoin(x) || this.isTailCell(x))) {
+      x += (dir === 'left') ? -1 : 1;
+      burstCount += op === 'mov' ? this.getMovWidth(x) : this.getDelWidth(x);
+    }
+    return burstCount;
+  }
+
+  public burst(op: 'mov'|'del', dir: 'left'|'right', x: number): number {
+    if (CompatBufferLine.disableAtomicEditing) {
+      return 1; // for demo: disable bursting and just return 1
+    }
+
+    const getW = (i: number): number => op === 'mov' ? this.getMovWidth(i) : this.getDelWidth(i);
+
+    const snapToRoot = (i: number): number => {
+      while (i > 0 && (this.getVisJoin(i) || this.isTailCell(i))) i--;
+      return i;
+    };
+
+    const snapToEnd = (i: number): number => {
+      while (i + 1 < this.length && (this.getVisJoin(i + 1) || this.isTailCell(i + 1))) i++;
+      return i;
+    };
+
+    // which cell is affected by this key?
+    const col = (dir === 'left') ? x - 1 : x;
+    if (col < 0 || col >= this.length) return 1;
+
+    let b = 0;
+    if (dir === 'left') {
+      const root = snapToRoot(col);
+      for (let j = col; j >= root; j--) {
+        if (this.isTailCell(j)) continue;
+        b += getW(j);
+      }
+    } else { // dir === right
+      const end = snapToEnd(col);
+      for (let j = col; j <= end; j++) {
+        if (this.isTailCell(j)) continue;
+        b += getW(j);
+      }
+    }
+
+    // return at least 1
+    return b >= 1 ? b : 1;
   }
 
 }

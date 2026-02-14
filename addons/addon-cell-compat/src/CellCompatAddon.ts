@@ -7,6 +7,7 @@ import { CompatBufferLine } from './CompatBufferLine';
 
 export class CellCompatAddon implements ITerminalAddon {
   private _provider?: UcVerCompatProvider;
+  private _atomic = true;
 
   public activate(terminal: Terminal): void {
     if (!this._provider) {
@@ -47,6 +48,10 @@ export class CellCompatAddon implements ITerminalAddon {
   public setUseUc17(enable: boolean): void {
     if (!this._provider) throw new Error('CellCompatAddon not activated');
     this._provider.useUc17 = enable;
+  }
+
+  public setAtomic(enable: boolean, term: Terminal): void {
+    CompatBufferLine.disableAtomicEditing = !enable;
   }
 }
 

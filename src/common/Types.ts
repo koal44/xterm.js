@@ -276,6 +276,7 @@ export interface IBufferLine {
   visToAppIndex(visCol: number): [number, number];
   appToVisIndex(appCol: number): number;
   inspectVisual(col: number): {start: number, end: number, text: string, cells: string[] };
+  burst(op: 'mov'|'del', dir: 'left'|'right', x: number): number;
 }
 
 export interface IMarker extends IDisposable {
