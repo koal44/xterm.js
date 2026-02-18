@@ -464,7 +464,7 @@ export class WebglRenderer extends Disposable implements IRenderer {
         }
 
         if (cell.code !== NULL_CELL_CODE) {
-          this._model.lineLengths[y] = Math.min(vx + dx, terminal.cols); // vx + dx; // + dvx;
+          this._model.lineLengths[y] = Math.min(vx + dvx, terminal.cols);
         }
 
         // Nothing has changed, no updates needed
@@ -492,6 +492,8 @@ export class WebglRenderer extends Disposable implements IRenderer {
           this._model.cells[ti + RENDER_MODEL_BG_OFFSET] = this._cellColorResolver.result.bg;
           this._model.cells[ti + RENDER_MODEL_FG_OFFSET] = this._cellColorResolver.result.fg;
           this._model.cells[ti + RENDER_MODEL_EXT_OFFSET] = this._cellColorResolver.result.ext;
+
+          this._glyphRenderer.value!.updateCell(vx+t, y, NULL_CELL_CODE, this._cellColorResolver.result.bg, this._cellColorResolver.result.fg, this._cellColorResolver.result.ext,'', 1, lastBg);
         }
 
         this._glyphRenderer.value!.updateCell(vx, y, cell.code, this._cellColorResolver.result.bg, this._cellColorResolver.result.fg, this._cellColorResolver.result.ext, cell.chars, cell.visWidth, lastBg);
